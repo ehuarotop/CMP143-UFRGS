@@ -51,13 +51,19 @@ int main()
     //Indicating that current context will be window recently created
 	glfwMakeContextCurrent(window);
 
-
 	//Initialize GLAD
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 	{
 	    std::cout << "Failed to initialize GLAD" << std::endl;
 	    return -1;
 	}
+
+    // Printing to terminal opengl and glsl version
+    const GLubyte *vendor      = glGetString(GL_VENDOR);
+    const GLubyte *renderer    = glGetString(GL_RENDERER);
+    const GLubyte *glversion   = glGetString(GL_VERSION);
+    const GLubyte *glslversion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+    printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
 
 	/////////////////////////////////////////////////////////////////////////////////
 
