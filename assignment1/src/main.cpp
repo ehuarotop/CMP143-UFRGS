@@ -21,6 +21,9 @@ using namespace std;
 const int MAX_MATERIAL_COUNT = 1;
 int g_num_triangles = 0;
 
+float g_min_X=0.0f, g_max_X=0.0f, g_min_Y=0.0f, g_max_Y=0.0f, g_min_Z=0.0f, g_max_Z=0.0f;
+float g_min_total=0.0f, g_max_total=0.0f;
+
 //Defining struct for triangle
 struct Triangle {
 	glm::vec3 v0, v1, v2, face_normal;
@@ -40,6 +43,7 @@ unsigned int readFile(const char* filename);
 glm::mat4 camera(float Translate, glm::vec2 const & Rotate);
 
 int main(){
+
     //Initiating glfw
     glfwInit();
 
@@ -82,7 +86,48 @@ int main(){
     Shader custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl");
 
     /////////////////// Reading file ///////////////////
-    unsigned int VAO = readFile("data/cube.in");
+    unsigned int VAO = readFile("data/cow_up.in");
+
+    printf("min_X: %f\nmax_X: %f\nmin_Y: %f\nmax_Y: %f\nmin_Z: %f\nmax_Z: %f\n", 
+        g_min_X,g_max_X,g_min_Y,g_max_Y,g_min_Z,g_max_Z);
+
+    //Setting size of rendering window
+    glViewport(0, 0, window_width, window_height);
+
+    //Setting callback for buffer size change
+    //glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    //Getting min and max total
+    ////// MIN /////
+    if(g_min_X < g_min_Y){
+        if(g_min_X < g_min_Z){
+            g_min_total = g_min_X;
+        }else{
+            g_min_total = g_min_Z;
+        }
+    }else{
+        if(g_min_Y < g_min_Z){
+            g_min_total = g_min_Y;
+        }else{
+            g_min_total = g_min_Z;
+        }
+    }
+
+    ///// MAX /////
+    if (g_max_X > g_max_Y){
+        if(g_max_X > g_max_Z){
+            g_max_total = g_max_X;
+        }else{
+            g_max_total = g_max_Z;
+        }
+    }else{
+        if(g_max_Y > g_max_Z){
+            g_max_total = g_max_Y;
+        }else{
+            g_max_total = g_max_Z;
+        }
+    }
+
 
     //Rendering into the created window
 	while(!glfwWindowShouldClose(window))
@@ -99,31 +144,26 @@ int main(){
         custom_shader.use();
 
 		//create transformations
-		glm::mat4 model         = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		glm::mat4 model         = glm::mat4(1.0f);
         glm::mat4 view          = glm::mat4(1.0f);
         glm::mat4 projection    = glm::mat4(1.0f);
 
-        //model = glm::scale(glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f)), glm::vec3(0.15f,0.15f,0.15f));
-        //model = glm::translate(glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.0f, 0.0f)), 
-                //glm::vec3(0.0f, 0.0f, 0.0f));
-        //model = glm::translate(glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f,0.0f,0.0f)), glm::vec3(0.0f, 0.0f, 0.0f));
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        //view  = glm::translate(view, glm::vec3(0.0f, 0.0f, -10.0f));
-        view = glm::lookAt(glm::vec3(0.0f, 0.0f, -15.0f), 
-           glm::vec3(0.0f, 0.0f, 0.0f), 
-           glm::vec3(0.0f, 1.0f, 0.0f));
-        projection = glm::perspective(glm::radians(45.0f), (float)500 / (float)500, 0.1f, 100.0f);
+        float range_x = (g_min_X+g_max_X)/2.0f;
+        float range_y = (g_min_Y+g_max_Y)/2.0f;
+        float range_z = (g_min_Z+g_max_Z)/2.0f;
 
-        //rotation
-        /*float radius = 10.0f;
-        float camX   = sin(glfwGetTime()) * radius;
-        float camZ   = cos(glfwGetTime()) * radius;
-        view = glm::lookAt(glm::vec3(camX, 0.0f, camZ), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));*/
+        //Translating the model to the origin (0,0,0)
+        glm::mat4 trans = glm::translate(model, glm::vec3(-range_x, -range_y, -range_z));
+        model = trans * model;
 
-        float radius = -15.0f;
-        float camX   = sin(glfwGetTime()) * radius;
-        float camZ   = cos(glfwGetTime()) * radius;
-        view = glm::lookAt(glm::vec3(camX, 0.0f, camZ), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        //View matrix
+        view = glm::lookAt(glm::vec3(0.0f, 0.0f, g_max_total - g_min_total),
+                            glm::vec3(0.0f,0.0f,0.0f),
+                            glm::vec3(0.0f,1.0f,0.0f));
+
+        projection = glm::perspective(glm::radians(45.0f),
+                                        float(window_width)/float(window_height),
+                                        0.1f, g_max_total - g_min_total);
 
         // retrieve the matrix uniform locations
         unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
@@ -196,6 +236,7 @@ unsigned int readFile(const char* filename){
 	struct Triangle Tris[num_triangles];
 	//
 	for (i=0; i<num_triangles; i++) { // read triangles
+
 		fscanf(fp, "v0 %f %f %f %f %f %f %d\n",
 				&(Tris[i].v0.x), &(Tris[i].v0.y), &(Tris[i].v0.z),
 				&(Tris[i].normal[0].x), &(Tris[i]. normal [0].y), &(Tris[i]. normal [0].z),
@@ -217,6 +258,69 @@ unsigned int readFile(const char* filename){
 		Tris[i].Color[0] = (unsigned char)(int)(255*(diffuse[color_index[0]].x));
 		Tris[i].Color[1] = (unsigned char)(int)(255*(diffuse[color_index[1]].y));
 		Tris[i].Color[2] = (unsigned char)(int)(255*(diffuse[color_index[2]].z));
+
+        //Getting min and max for X axis
+        if(Tris[i].v0.x < g_min_X){
+            g_min_X = Tris[i].v0.x;
+        }
+        if(Tris[i].v1.x < g_min_X){
+            g_min_X = Tris[i].v1.x;
+        }
+        if(Tris[i].v2.x < g_min_X){
+            g_min_X = Tris[i].v2.x;
+        }
+
+        if(Tris[i].v0.x > g_max_X){
+            g_max_X = Tris[i].v0.x;
+        }
+        if(Tris[i].v1.x > g_max_X){
+            g_max_X = Tris[i].v1.x;
+        }
+        if(Tris[i].v2.x > g_max_X){
+            g_max_X = Tris[i].v2.x;
+        }
+
+        //Getting min and max for Y axis
+        if(Tris[i].v0.y < g_min_Y){
+            g_min_Y = Tris[i].v0.y;
+        }
+        if(Tris[i].v1.y < g_min_Y){
+            g_min_Y = Tris[i].v1.y;
+        }
+        if(Tris[i].v2.y < g_min_Y){
+            g_min_Y = Tris[i].v2.y;
+        }
+
+        if(Tris[i].v0.y > g_max_Y){
+            g_max_Y = Tris[i].v0.y;
+        }
+        if(Tris[i].v1.y > g_max_Y){
+            g_max_Y = Tris[i].v1.y;
+        }
+        if(Tris[i].v2.y > g_max_Y){
+            g_max_Y = Tris[i].v2.y;
+        }
+
+        //Getting min and max for Z axis
+        if(Tris[i].v0.z < g_min_Z){
+            g_min_Z = Tris[i].v0.z;
+        }
+        if(Tris[i].v1.z < g_min_Z){
+            g_min_Z = Tris[i].v1.z;
+        }
+        if(Tris[i].v2.z < g_min_Z){
+            g_min_Z = Tris[i].v2.z;
+        }
+
+        if(Tris[i].v0.z > g_max_Z){
+            g_max_Z = Tris[i].v0.z;
+        }
+        if(Tris[i].v1.z > g_max_Z){
+            g_max_Z = Tris[i].v1.z;
+        }
+        if(Tris[i].v2.z > g_max_Z){
+            g_max_Z = Tris[i].v2.z;
+        }
 	}
 
 	fclose(fp);
