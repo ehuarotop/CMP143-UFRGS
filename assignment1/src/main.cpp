@@ -1,4 +1,22 @@
 #include <glad/glad.h>
+
+#if defined(NANOGUI_GLAD)
+    #if defined(NANOGUI_SHARED) && !defined(GLAD_GLAPI_EXPORT)
+        #define GLAD_GLAPI_EXPORT
+    #endif
+
+    #include <glad/glad.h>
+#else
+    #if defined(__APPLE__)
+        #define GLFW_INCLUDE_GLCOREARB
+    #else
+        #define GL_GLEXT_PROTOTYPES
+    #endif
+#endif
+
+
+#include <nanogui/nanogui.h>
+
 #include <GLFW/glfw3.h>
 
 //Includes for matrix transformations using glm
@@ -16,6 +34,24 @@
 #include <sstream>
 
 using namespace std;
+using namespace nanogui;
+//using nanogui::Screen;
+
+//Defining nanogui variables
+Screen *screen = nullptr;
+enum test_enum {
+    Item1 = 0,
+    Item2,
+    Item3
+};
+
+bool bvar = true;
+int ivar = 12345678;
+double dvar = 3.1415926;
+float fvar = (float)dvar;
+std::string strval = "A string";
+test_enum enumval = Item2;
+Color colval(0.5f, 0.5f, 0.7f, 1.f);
 
 //Defining constant for max number of materials in input file.
 const int MAX_MATERIAL_COUNT = 1;
@@ -30,7 +66,6 @@ struct Triangle {
 	glm::vec3 normal[3];
 	float Color[3];
 };
-
 
 //Function declaration
 //calback for resizing window
@@ -57,13 +92,23 @@ int main(){
     int window_height = 500;
 
     //Creating window with width and height specified before.
-    GLFWwindow* window = glfwCreateWindow(window_width, window_height, "CMP143 - 00312086 - Felix Eduardo Huaroto Pachas", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(window_width, window_height, 
+        "CMP143 - 00312086 - Felix Eduardo Huaroto Pachas", NULL, NULL);
 	if (window == NULL)
 	{
 	    std::cout << "Failed to create GLFW window" << std::endl;
 	    glfwTerminate();
 	    return -1;
 	}
+
+    /*GLFWwindow* window = glfwCreateWindow(window_width, window_height, 
+        "OpenGL control", NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }*/
 
     //Indicating that current context will be window recently created
 	glfwMakeContextCurrent(window);
@@ -82,8 +127,87 @@ int main(){
     const GLubyte *glslversion = glGetString(GL_SHADING_LANGUAGE_VERSION);
     printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
 
+    //////////////////// NANOGUI ////////////////////
+    // Create a nanogui screen and pass the glfw pointer to initialize
+    screen = new Screen();
+    screen->initialize(window, true);
+
+    bool enabled = true;
+    FormHelper *gui = new FormHelper(screen);
+    nanogui::ref<Window> nanoguiWindow = gui->addWindow(Eigen::Vector2i(10, 10), "Form helper example");
+    gui->addGroup("Basic types");
+    gui->addVariable("bool", bvar)->setTooltip("Test tooltip.");
+    gui->addVariable("string", strval);
+
+    gui->addGroup("Validating fields");
+    gui->addVariable("int", ivar)->setSpinnable(true);
+    gui->addVariable("float", fvar)->setTooltip("Test.");
+    gui->addVariable("double", dvar)->setSpinnable(true);
+
+    gui->addGroup("Complex types");
+    gui->addVariable("Enumeration", enumval, enabled)->setItems({ "Item 1", "Item 2", "Item 3" });
+    gui->addVariable("Color", colval)
+       ->setFinalCallback([](const Color &c) {
+             std::cout << "ColorPicker Final Callback: ["
+                       << c.r() << ", "
+                       << c.g() << ", "
+                       << c.b() << ", "
+                       << c.w() << "]" << std::endl;
+         });
+
+    gui->addGroup("Other widgets");
+    gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; })->setTooltip("Testing a much longer tooltip, that will wrap around to new lines multiple times.");;
+
+    screen->setVisible(true);
+    screen->performLayout();
+    nanoguiWindow->center();
+
+    glfwSetCursorPosCallback(window,
+            [](GLFWwindow *, double x, double y) {
+            screen->cursorPosCallbackEvent(x, y);
+        }
+    );
+
+    glfwSetMouseButtonCallback(window,
+        [](GLFWwindow *, int button, int action, int modifiers) {
+            screen->mouseButtonCallbackEvent(button, action, modifiers);
+        }
+    );
+
+    glfwSetKeyCallback(window,
+        [](GLFWwindow *, int key, int scancode, int action, int mods) {
+            screen->keyCallbackEvent(key, scancode, action, mods);
+        }
+    );
+
+    glfwSetCharCallback(window,
+        [](GLFWwindow *, unsigned int codepoint) {
+            screen->charCallbackEvent(codepoint);
+        }
+    );
+
+    glfwSetDropCallback(window,
+        [](GLFWwindow *, int count, const char **filenames) {
+            screen->dropCallbackEvent(count, filenames);
+        }
+    );
+
+    glfwSetScrollCallback(window,
+        [](GLFWwindow *, double x, double y) {
+            screen->scrollCallbackEvent(x, y);
+       }
+    );
+
+    glfwSetFramebufferSizeCallback(window,
+        [](GLFWwindow *, int width, int height) {
+            screen->resizeCallbackEvent(width, height);
+        }
+    );
+
+    //////////////////// END NANOGUI ////////////////////
+
     //Loading shaders
-    Shader custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl");
+    CustomShader custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl");
 
     /////////////////// Reading file ///////////////////
     unsigned int VAO = readFile("data/cow_up.in");
@@ -139,6 +263,10 @@ int main(){
 		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
+        // Draw nanogui
+        screen->drawContents();
+        screen->drawWidgets();
+
 		// Using GPU Program created
         //glUseProgram(shaderProgram);
         custom_shader.use();
@@ -174,12 +302,6 @@ int main(){
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-        //Color as uniform
-        /*float timeValue = glfwGetTime();
-        float greenValue = cos(timeValue) / 2.0f + 0.5f;
-        int vertexColorLocation = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
-        glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);*/
 
 		//Binding VAO, maybe no need to binding it every time because have only one VAO
         glBindVertexArray(VAO);
