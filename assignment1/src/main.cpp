@@ -1,4 +1,4 @@
-#include <glad/glad.h>
+//#include <glad/glad.h>
 
 #if defined(NANOGUI_GLAD)
     #if defined(NANOGUI_SHARED) && !defined(GLAD_GLAPI_EXPORT)
@@ -14,10 +14,34 @@
     #endif
 #endif
 
-
+//NANOGUI includes
+#include <nanogui/opengl.h>
+#include <nanogui/glutil.h>
+#include <nanogui/screen.h>
+#include <nanogui/window.h>
+#include <nanogui/layout.h>
+#include <nanogui/label.h>
+#include <nanogui/checkbox.h>
+#include <nanogui/button.h>
+#include <nanogui/toolbutton.h>
+#include <nanogui/popupbutton.h>
+#include <nanogui/combobox.h>
+#include <nanogui/progressbar.h>
+#include <nanogui/entypo.h>
+#include <nanogui/messagedialog.h>
+#include <nanogui/textbox.h>
+#include <nanogui/slider.h>
+#include <nanogui/imagepanel.h>
+#include <nanogui/imageview.h>
+#include <nanogui/vscrollpanel.h>
+#include <nanogui/colorwheel.h>
+#include <nanogui/graph.h>
+#include <nanogui/tabwidget.h>
+#include <nanogui/glcanvas.h>
 #include <nanogui/nanogui.h>
 
-#include <GLFW/glfw3.h>
+//#include <glad/glad.h>
+//#include <GLFW/glfw3.h>
 
 //Includes for matrix transformations using glm
 #include <glm/vec3.hpp> // glm::vec3
@@ -35,30 +59,31 @@
 
 using namespace std;
 using namespace nanogui;
-//using nanogui::Screen;
 
-//Defining nanogui variables
-Screen *screen = nullptr;
-enum test_enum {
-    Item1 = 0,
-    Item2,
-    Item3
-};
+//Loading shaders
+CustomShader custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl");
 
-bool bvar = true;
-int ivar = 12345678;
-double dvar = 3.1415926;
-float fvar = (float)dvar;
-std::string strval = "A string";
-test_enum enumval = Item2;
-Color colval(0.5f, 0.5f, 0.7f, 1.f);
+///////////////////////// FUNCTION DECLARATION /////////////////////////
+//calback for resizing window
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+//callback for processing input
+void processInput(GLFWwindow *window);
+//function to read files with extension .in (models)
+unsigned int readFile(const char* filename);
 
-//Defining constant for max number of materials in input file.
-const int MAX_MATERIAL_COUNT = 1;
-int g_num_triangles = 0;
+///////////////////////// GLOBAL VARIABLES /////////////////////////
+//// NANOGUI ////
+//Screen *screen = nullptr;
+MatrixXu indices;
+MatrixXf positions;
 
+//// DATA ////
+//MatrixXf positions;
 float g_min_X=0.0f, g_max_X=0.0f, g_min_Y=0.0f, g_max_Y=0.0f, g_min_Z=0.0f, g_max_Z=0.0f;
 float g_min_total=0.0f, g_max_total=0.0f;
+const int MAX_MATERIAL_COUNT = 1; //Defining constant for max number of materials in input file.
+int g_num_triangles = 0;
+
 
 //Defining struct for triangle
 struct Triangle {
@@ -67,20 +92,247 @@ struct Triangle {
 	float Color[3];
 };
 
-//Function declaration
-//calback for resizing window
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-//callback for processing input
-void processInput(GLFWwindow *window);
-//function to read files with extension .in (models)
-unsigned int readFile(const char* filename);
-//function to get camera working
-glm::mat4 camera(float Translate, glm::vec2 const & Rotate);
+//Defining a canvas class where objects will be rendered
+class MyGLCanvas : public GLCanvas{
+public:
+
+    MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent){
+        //using namespace nanogui;
+
+        //Setting viewport
+        glViewport(0, 0, 500, 500);
+
+        //Reading file with the information corresponding to the cube
+        VAO = readFile("data/cube.in");
+
+        //Getting min and max total
+        ////// MIN /////
+        if(g_min_X < g_min_Y){
+            if(g_min_X < g_min_Z){
+                g_min_total = g_min_X;
+            }else{
+                g_min_total = g_min_Z;
+            }
+        }else{
+            if(g_min_Y < g_min_Z){
+                g_min_total = g_min_Y;
+            }else{
+                g_min_total = g_min_Z;
+            }
+        }
+
+        ///// MAX /////
+        if (g_max_X > g_max_Y){
+            if(g_max_X > g_max_Z){
+                g_max_total = g_max_X;
+            }else{
+                g_max_total = g_max_Z;
+            }
+        }else{
+            if(g_max_Y > g_max_Z){
+                g_max_total = g_max_Y;
+            }else{
+                g_max_total = g_max_Z;
+            }
+        }
+
+        /*mShader.init(
+            /* An identifying name */
+            //"assigment_shader",
+
+            /* Vertex shader */
+            /*"#version 330\n"
+            "layout (location = 0) in vec3 vert;\n"
+            "layout (location = 1) in vec3 color;\n"
+            "out vec4 rasterizer_color;\n"
+            "uniform mat4 model;\n"
+            "uniform mat4 view;\n"
+            "uniform mat4 projection;\n"
+            "void main() {\n"
+            "    gl_Position = projection * view * model * vec4(vert, 1.0);\n"
+            "    rasterizer_color = vec4(color, 1.0f);\n"
+            "}",
+
+            /* Fragment shader */
+            /*"#version 330\n"
+            "uniform vec4 rasterizer_color;\n"
+            "out vec4 FragColor;\n"
+            "void main() {\n"
+            "    FragColor = rasterizer_color;\n"
+            "}"
+        );*/
+
+        //Binding the shader
+        //mShader.bind();
+
+    }
+
+    /*~MyGLCanvas() {
+        mShader.free();
+    }*/
+
+    virtual void drawGL() override {
+        //Loading the shader program
+        custom_shader.use();
+
+        //create transformations
+        glm::mat4 model         = glm::mat4(1.0f);
+        glm::mat4 view          = glm::mat4(1.0f);
+        glm::mat4 projection    = glm::mat4(1.0f);
+
+        float range_x = (g_min_X+g_max_X)/2.0f;
+        float range_y = (g_min_Y+g_max_Y)/2.0f;
+        float range_z = (g_min_Z+g_max_Z)/2.0f;
+
+        //Translating the model to the origin (0,0,0)
+        glm::mat4 trans = glm::translate(model, glm::vec3(-range_x, -range_y, -range_z));
+        model = trans * model;
+
+        //View matrix
+        view = glm::lookAt(glm::vec3(0.0f, 0.0f, g_max_total - g_min_total),
+                            glm::vec3(0.0f,0.0f,0.0f),
+                            glm::vec3(0.0f,1.0f,0.0f));
+
+        projection = glm::perspective(glm::radians(45.0f),
+                                        float(500)/float(500),
+                                        0.1f, g_max_total - g_min_total);
+
+        // retrieve the matrix uniform locations
+        unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
+        unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
+        unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
+
+        // pass them to the shaders (3 different ways)
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+        glBindVertexArray(VAO);
+
+        glEnable(GL_DEPTH_TEST);
+        /* Draw 12 triangles starting at index 0 */
+        //mShader.drawIndexed(GL_TRIANGLES, 0, 12);
+
+        glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
+
+        //Swapping buffers
+        //glfwSwapBuffers(this);
+        
+        //Keyboard and mouse events
+        glfwPollEvents();
+        
+        glDisable(GL_DEPTH_TEST);
+    }
+
+private:
+    nanogui::GLShader mShader;
+    unsigned int VAO;
+    //CustomShader custom_shader;
+};
+
+
+class App : public nanogui::Screen {
+public:
+
+    Window *window;
+    Window *windowGUI;
+
+    App() : nanogui::Screen(Eigen::Vector2i(800, 600), "Programming Assignment 1", false) {
+        using namespace nanogui;
+
+        // Printing to terminal opengl and glsl version
+        const GLubyte *vendor      = glGetString(GL_VENDOR);
+        const GLubyte *renderer    = glGetString(GL_RENDERER);
+        const GLubyte *glversion   = glGetString(GL_VERSION);
+        const GLubyte *glslversion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+        printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
+
+        //Creating window for render the object and perform operations
+        window = new Window(this, "Rendering Polygonal Meshes with OpenGL and GLSL shaders");
+        window->setPosition(Vector2i(15, 15));
+        window->setLayout(new GroupLayout());
+
+        mCanvasObject = new MyGLCanvas(window);
+        mCanvasObject->setBackgroundColor({100, 100, 100, 255});
+        mCanvasObject->setSize({500, 500});
+
+        windowGUI = new Window(this, "Options");
+        windowGUI->setPosition(Vector2i(570,15));
+        windowGUI->setLayout(new GroupLayout());
+
+        Widget *tools = new Widget(windowGUI);
+        tools->setLayout(new BoxLayout(Orientation::Vertical,
+                                       Alignment::Fill, 0, 6));
+
+        Button *load_cube = new Button(tools, "Load cube object");
+        load_cube->setCallback([this](){
+            cout<<"load cube button pressed\n";
+            cout<<custom_shader.ID<<"\n";
+        });
+
+        Button *load_cow = new Button(tools, "Load Cow object");
+        load_cow->setCallback([this](){
+            cout<<"load cube button pressed\n";
+        });
+
+        /*Button *b0 = new Button(tools, "Random Color");
+        b0->setCallback([this]() { mCanvas->setBackgroundColor(Vector4i(rand() % 256, rand() % 256, rand() % 256, 255)); });
+
+        Button *b1 = new Button(tools, "Random Rotation");
+        b1->setCallback([this]() { mCanvas->setRotation(nanogui::Vector3f((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f)); });*/
+
+        performLayout();
+    }
+
+    virtual bool keyboardEvent(int key, int scancode, int action, int modifiers) {
+        if (Screen::keyboardEvent(key, scancode, action, modifiers))
+            return true;
+        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+            setVisible(false);
+            return true;
+        }
+        return false;
+    }
+
+    virtual void draw(NVGcontext *ctx) {
+        /* Draw the user interface */
+        Screen::draw(ctx);
+    }
+
+private:
+    MyGLCanvas *mCanvasObject;
+    MyGLCanvas *mCanvasGUI;
+};
 
 int main(){
 
+    try{
+        nanogui::init();
+        
+        // scoped variables
+        {
+            nanogui::ref<App> app = new App();
+            //Indicating that current context will be window recently created
+            app->drawAll();
+            app->setVisible(true);
+            nanogui::mainloop();
+        }
+
+        nanogui::shutdown();
+    }catch (const std::runtime_error &e) {
+        std::string error_msg = std::string("Caught a fatal error: ") + std::string(e.what());
+        #if defined(_WIN32)
+            MessageBoxA(nullptr, error_msg.c_str(), NULL, MB_ICONERROR | MB_OK);
+        #else
+            std::cerr << error_msg << endl;
+        #endif
+        return -1;
+    }
+
+    //return 0;
+
     //Initiating glfw
-    glfwInit();
+    /*glfwInit();
 
     //Defining glfw properties for opengl Version
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -101,15 +353,6 @@ int main(){
 	    return -1;
 	}
 
-    /*GLFWwindow* window = glfwCreateWindow(window_width, window_height, 
-        "OpenGL control", NULL, NULL);
-    if (window == NULL)
-    {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        return -1;
-    }*/
-
     //Indicating that current context will be window recently created
 	glfwMakeContextCurrent(window);
 
@@ -126,85 +369,6 @@ int main(){
     const GLubyte *glversion   = glGetString(GL_VERSION);
     const GLubyte *glslversion = glGetString(GL_SHADING_LANGUAGE_VERSION);
     printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
-
-    //////////////////// NANOGUI ////////////////////
-    // Create a nanogui screen and pass the glfw pointer to initialize
-    screen = new Screen();
-    screen->initialize(window, true);
-
-    bool enabled = true;
-    FormHelper *gui = new FormHelper(screen);
-    nanogui::ref<Window> nanoguiWindow = gui->addWindow(Eigen::Vector2i(10, 10), "Form helper example");
-    gui->addGroup("Basic types");
-    gui->addVariable("bool", bvar)->setTooltip("Test tooltip.");
-    gui->addVariable("string", strval);
-
-    gui->addGroup("Validating fields");
-    gui->addVariable("int", ivar)->setSpinnable(true);
-    gui->addVariable("float", fvar)->setTooltip("Test.");
-    gui->addVariable("double", dvar)->setSpinnable(true);
-
-    gui->addGroup("Complex types");
-    gui->addVariable("Enumeration", enumval, enabled)->setItems({ "Item 1", "Item 2", "Item 3" });
-    gui->addVariable("Color", colval)
-       ->setFinalCallback([](const Color &c) {
-             std::cout << "ColorPicker Final Callback: ["
-                       << c.r() << ", "
-                       << c.g() << ", "
-                       << c.b() << ", "
-                       << c.w() << "]" << std::endl;
-         });
-
-    gui->addGroup("Other widgets");
-    gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; })->setTooltip("Testing a much longer tooltip, that will wrap around to new lines multiple times.");;
-
-    screen->setVisible(true);
-    screen->performLayout();
-    nanoguiWindow->center();
-
-    glfwSetCursorPosCallback(window,
-            [](GLFWwindow *, double x, double y) {
-            screen->cursorPosCallbackEvent(x, y);
-        }
-    );
-
-    glfwSetMouseButtonCallback(window,
-        [](GLFWwindow *, int button, int action, int modifiers) {
-            screen->mouseButtonCallbackEvent(button, action, modifiers);
-        }
-    );
-
-    glfwSetKeyCallback(window,
-        [](GLFWwindow *, int key, int scancode, int action, int mods) {
-            screen->keyCallbackEvent(key, scancode, action, mods);
-        }
-    );
-
-    glfwSetCharCallback(window,
-        [](GLFWwindow *, unsigned int codepoint) {
-            screen->charCallbackEvent(codepoint);
-        }
-    );
-
-    glfwSetDropCallback(window,
-        [](GLFWwindow *, int count, const char **filenames) {
-            screen->dropCallbackEvent(count, filenames);
-        }
-    );
-
-    glfwSetScrollCallback(window,
-        [](GLFWwindow *, double x, double y) {
-            screen->scrollCallbackEvent(x, y);
-       }
-    );
-
-    glfwSetFramebufferSizeCallback(window,
-        [](GLFWwindow *, int width, int height) {
-            screen->resizeCallbackEvent(width, height);
-        }
-    );
-
-    //////////////////// END NANOGUI ////////////////////
 
     //Loading shaders
     CustomShader custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl");
@@ -263,10 +427,6 @@ int main(){
 		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-        // Draw nanogui
-        screen->drawContents();
-        screen->drawWidgets();
-
 		// Using GPU Program created
         //glUseProgram(shaderProgram);
         custom_shader.use();
@@ -314,7 +474,7 @@ int main(){
         
 	    //Keyboard and mouse events
 	    glfwPollEvents();    
-	}
+	}*/
 }
 
 unsigned int readFile(const char* filename){
@@ -356,7 +516,7 @@ unsigned int readFile(const char* filename){
 	// allocate triangles for tri model
 	printf ("Reading in %s (%d triangles). . .\n", filename, num_triangles);
 	struct Triangle Tris[num_triangles];
-	//
+
 	for (i=0; i<num_triangles; i++) { // read triangles
 
 		fscanf(fp, "v0 %f %f %f %f %f %f %d\n",
@@ -376,7 +536,6 @@ unsigned int readFile(const char* filename){
 		fscanf(fp, "face normal %f %f %f\n", &(Tris[i].face_normal.x), &(Tris[i].face_normal.y),
 				&(Tris[i].face_normal.z));
 		
-		//
 		Tris[i].Color[0] = (unsigned char)(int)(255*(diffuse[color_index[0]].x));
 		Tris[i].Color[1] = (unsigned char)(int)(255*(diffuse[color_index[1]].y));
 		Tris[i].Color[2] = (unsigned char)(int)(255*(diffuse[color_index[2]].z));
@@ -497,11 +656,6 @@ unsigned int readFile(const char* filename){
     //Setting 0 in position (according to the specification on the shader)
     glEnableVertexAttribArray(0);
 
-    //Position, # dimensions, data type, ##, 0, 0
-    //glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3* sizeof(float)));
-    //Setting 0 in position (according to the specification on the shader)
-    //glEnableVertexAttribArray(1);
-
     //Unbinding the VBO buffer
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -521,4 +675,5 @@ unsigned int readFile(const char* filename){
     glBindVertexArray(0);
 
     return VAO;
+    //return 0;
 }
