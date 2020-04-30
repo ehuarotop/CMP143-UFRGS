@@ -1,5 +1,3 @@
-//#include <glad/glad.h>
-
 #if defined(NANOGUI_GLAD)
     #if defined(NANOGUI_SHARED) && !defined(GLAD_GLAPI_EXPORT)
         #define GLAD_GLAPI_EXPORT
@@ -40,9 +38,6 @@
 #include <nanogui/glcanvas.h>
 #include <nanogui/nanogui.h>
 
-//#include <glad/glad.h>
-//#include <GLFW/glfw3.h>
-
 //Includes for matrix transformations using glm
 #include <glm/vec3.hpp> // glm::vec3
 #include <glm/vec4.hpp> // glm::vec4
@@ -56,13 +51,9 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <list>
 
 using namespace std;
 using namespace nanogui;
-
-//Loading shaders
-CustomShader custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl");
 
 ///////////////////////// FUNCTION DECLARATION /////////////////////////
 //calback for resizing window
@@ -71,16 +62,12 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 //function to read files with extension .in (models)
 unsigned int readFile(const char* filename);
-//function to mapping glm::mat4 to Eigen:Matrix4f
-Matrix4f toEigenMatrix(glm::mat4& matrix);
 
 ///////////////////////// GLOBAL VARIABLES /////////////////////////
 //// NANOGUI ////
 //Screen *screen = nullptr;
-//Defining indices list and his iterator
-std::vector<glm::vec3> list_indices;
-std::vector<glm::vec3>::iterator it;
-std::vector<glm::vec3> list_positions;
+MatrixXu indices;
+MatrixXf positions;
 
 //// DATA ////
 //MatrixXf positions;
@@ -92,19 +79,34 @@ int g_num_triangles = 0;
 
 //Defining struct for triangle
 struct Triangle {
-	glm::vec3 v0, v1, v2, face_normal;
-	glm::vec3 normal[3];
-	float Color[3];
+    glm::vec3 v0, v1, v2, face_normal;
+    glm::vec3 normal[3];
+    float Color[3];
 };
 
 //Defining a canvas class where objects will be rendered
 class MyGLCanvas : public GLCanvas{
 public:
 
-    MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent){
+    int model_used;
+
+    MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl"){
 
         //Reading file with the information corresponding to the cube
-        VAO = readFile("data/cow_up.in");
+        custom_shader.use();
+        if (model_filename != "data/cube.in" && model_filename != "data/cow_up.in")
+            model_used = 0;
+
+    }
+
+    void setModel(const char* filename){
+        this->model_filename = filename;
+        VAO = readFile(model_filename);
+
+        if (filename == "data/cube.in")
+            model_used = 1;
+        else if (filename == "data/cow_up.in")
+            model_used = 2;
 
         //Getting min and max total
         ////// MIN /////
@@ -137,79 +139,11 @@ public:
             }
         }
 
-        mShader.init(
-            /* An identifying name */
-            "assigment_shader",
+        printf("min_X: %f\nmax_X: %f\nmin_Y: %f\nmax_Y: %f\nmin_Z: %f\nmax_Z: %f\n", 
+        g_min_X,g_max_X,g_min_Y,g_max_Y,g_min_Z,g_max_Z);
 
-            /* Vertex shader */
-            "#version 330\n"
-            "layout (location = 0) in vec3 vert;\n"
-            //"layout (location = 1) in vec3 color;\n"
-            "out vec4 rasterizer_color;\n"
-            "uniform mat4 model;\n"
-            "uniform mat4 view;\n"
-            "uniform mat4 projection;\n"
-            "void main() {\n"
-            "    gl_Position = projection * view * model * vec4(vert, 1.0);\n"
-            "    rasterizer_color = vec4(0.5f,0.5f,0.5f, 1.0f);\n"
-            "}",
-
-            /* Fragment shader */
-            "#version 330\n"
-            "in vec4 rasterizer_color;\n"
-            "out vec4 FragColor;\n"
-            "void main() {\n"
-            "    FragColor = rasterizer_color;\n"
-            "}"
-        );
-
-        MatrixXu indices(3, g_num_triangles);
-        MatrixXf positions(3, list_indices.size());
-
-        int count = 0;
-        int index1 = 0;
-        int index2 = 0;
-        int index3 = 0;
-        int a = 0;
-
-        for(std::size_t i = 0; i < list_positions.size(); ++i){
-            count += 1;
-
-            std::vector<glm::vec3>::iterator itr = std::find(list_indices.begin(), 
-                list_indices.end(), list_positions.at(i));
-
-            if (itr != list_indices.cend()) {
-                int index = std::distance(list_indices.begin(), itr);
-
-                if (count % 3 == 1)
-                    index1 = index;
-                else if (count % 3 == 2)
-                    index2 = index;
-                else if (count % 3 == 0)
-                    index3 = index;
-            }else{
-                cout<<"Element not found\n";
-            }
-
-            if (count % 3 == 0){
-                //Setting element for indices
-                indices.col(i/3) << index1, index2, index3;
-            }
-        }
-
-        //Adding index positions
-        for(std::size_t i = 0; i < list_indices.size(); ++i){
-            positions.col(i) << list_indices.at(i).x, list_indices.at(i).y, list_indices.at(i).z;
-        }
-
-        //Binding the shader
-        mShader.bind();
-
-        mShader.uploadIndices(indices);
-
-        mShader.uploadAttrib("vert", positions);
-
-
+        cout<<g_max_total<<"\n";
+        cout<<g_min_total<<"\n";
     }
 
     /*~MyGLCanvas() {
@@ -218,44 +152,67 @@ public:
 
     virtual void drawGL() override {
 
-        //Binding the shader
-        mShader.bind();
+        if (model_used == 0){
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }else{
+            //Loading the shader program
+            custom_shader.use();
 
-        //create transformations
-        glm::mat4 model         = glm::mat4(1.0f);
-        glm::mat4 view          = glm::mat4(1.0f);
-        glm::mat4 projection    = glm::mat4(1.0f);
+            //create transformations
+            glm::mat4 model         = glm::mat4(1.0f);
+            glm::mat4 view          = glm::mat4(1.0f);
+            glm::mat4 projection    = glm::mat4(1.0f);
 
-        float range_x = (g_min_X+g_max_X)/2.0f;
-        float range_y = (g_min_Y+g_max_Y)/2.0f;
-        float range_z = (g_min_Z+g_max_Z)/2.0f;
+            float center_x = (g_min_X+g_max_X)/2.0f;
+            float center_y = (g_min_Y+g_max_Y)/2.0f;
+            float center_z = (g_min_Z+g_max_Z)/2.0f;
 
-        //Translating the model to the origin (0,0,0)
-        glm::mat4 trans = glm::translate(model, glm::vec3(-range_x, -range_y, -range_z));
-        model = trans * model;
+            //Translating the model to the origin (0,0,0)
+            glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-center_x, -center_y, -center_z));
+            model = trans * model;
 
-        //View matrix
-        view = glm::lookAt(glm::vec3(0.0f, 0.0f, g_max_total - g_min_total),
-                            glm::vec3(0.0f,0.0f,0.0f),
-                            glm::vec3(0.0f,1.0f,0.0f));
+            //View matrix
+            if(model_used == 1)
+                view = glm::lookAt(glm::vec3(0.0f, 0.0f, 4.0f),
+                               glm::vec3(0.0f,0.0f,0.0f),
+                               glm::vec3(0.0f,1.0f,0.0f));
+            else if (model_used == 2)
+                view = glm::lookAt(glm::vec3(0.0f, 0.0f, g_max_total - g_min_total),
+                               glm::vec3(0.0f,0.0f,0.0f),
+                               glm::vec3(0.0f,1.0f,0.0f));
 
-        projection = glm::perspective(glm::radians(45.0f),
-                                        float(500)/float(500),
-                                        0.1f, g_max_total - g_min_total);
+            projection = glm::perspective(glm::radians(45.0f),
+                                            ((float)this->width())/this->height(),
+                                            0.1f, g_max_total - g_min_total);
 
-        mShader.setUniform("model", toEigenMatrix(model));
-        mShader.setUniform("view", toEigenMatrix(view));
-        mShader.setUniform("projection", toEigenMatrix(projection));
+            // retrieve the matrix uniform locations
+            unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
+            unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
+            unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
 
-        glEnable(GL_DEPTH_TEST);
-        /* Draw 12 triangles starting at index 0 */
-        mShader.drawIndexed(GL_TRIANGLES, 0, g_num_triangles);
-        glDisable(GL_DEPTH_TEST);
+            // pass them to the shaders (3 different ways)
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+            glBindVertexArray(VAO);
+
+            glEnable(GL_DEPTH_TEST);
+
+            glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
+            
+            //Keyboard and mouse events
+            glfwPollEvents();
+            
+            glDisable(GL_DEPTH_TEST);
+        }
     }
 
 private:
-    nanogui::GLShader mShader;
     unsigned int VAO;
+    CustomShader custom_shader;
+    const char* model_filename;
 };
 
 
@@ -281,7 +238,7 @@ public:
         window->setLayout(new GroupLayout());
 
         mCanvasObject = new MyGLCanvas(window);
-        mCanvasObject->setBackgroundColor({255, 255, 255, 255});
+        mCanvasObject->setBackgroundColor({100, 100, 100, 255});
         mCanvasObject->setSize({500, 500});
 
         windowGUI = new Window(this, "Options");
@@ -294,20 +251,13 @@ public:
 
         Button *load_cube = new Button(tools, "Load cube object");
         load_cube->setCallback([this](){
-            cout<<"load cube button pressed\n";
-            cout<<custom_shader.ID<<"\n";
+            mCanvasObject->setModel("data/cube.in");
         });
 
         Button *load_cow = new Button(tools, "Load Cow object");
         load_cow->setCallback([this](){
-            cout<<"load cube button pressed\n";
+            mCanvasObject->setModel("data/cow_up.in");
         });
-
-        /*Button *b0 = new Button(tools, "Random Color");
-        b0->setCallback([this]() { mCanvas->setBackgroundColor(Vector4i(rand() % 256, rand() % 256, rand() % 256, 255)); });
-
-        Button *b1 = new Button(tools, "Random Rotation");
-        b1->setCallback([this]() { mCanvas->setRotation(nanogui::Vector3f((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f)); });*/
 
         performLayout();
     }
@@ -329,268 +279,74 @@ public:
 
 private:
     MyGLCanvas *mCanvasObject;
-    MyGLCanvas *mCanvasGUI;
+    //MyGLCanvas *mCanvasGUI;
 };
 
-int main(){
-
-    try{
-        nanogui::init();
-        
-        // scoped variables
-        {
-            nanogui::ref<App> app = new App();
-            //Indicating that current context will be window recently created
-            app->drawAll();
-            app->setVisible(true);
-            nanogui::mainloop();
-        }
-
-        nanogui::shutdown();
-    }catch (const std::runtime_error &e) {
-        std::string error_msg = std::string("Caught a fatal error: ") + std::string(e.what());
-        #if defined(_WIN32)
-            MessageBoxA(nullptr, error_msg.c_str(), NULL, MB_ICONERROR | MB_OK);
-        #else
-            std::cerr << error_msg << endl;
-        #endif
-        return -1;
-    }
-
-    //return 0;
-
-    //Initiating glfw
-    /*glfwInit();
-
-    //Defining glfw properties for opengl Version
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    //Specify the size of the window to be created
-    int window_width = 500;
-    int window_height = 500;
-
-    //Creating window with width and height specified before.
-    GLFWwindow* window = glfwCreateWindow(window_width, window_height, 
-        "CMP143 - 00312086 - Felix Eduardo Huaroto Pachas", NULL, NULL);
-	if (window == NULL)
-	{
-	    std::cout << "Failed to create GLFW window" << std::endl;
-	    glfwTerminate();
-	    return -1;
-	}
-
-    //Indicating that current context will be window recently created
-	glfwMakeContextCurrent(window);
-
-	//Initialize GLAD
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	{
-	    std::cout << "Failed to initialize GLAD" << std::endl;
-	    return -1;
-	}
-
-    // Printing to terminal opengl and glsl version
-    const GLubyte *vendor      = glGetString(GL_VENDOR);
-    const GLubyte *renderer    = glGetString(GL_RENDERER);
-    const GLubyte *glversion   = glGetString(GL_VERSION);
-    const GLubyte *glslversion = glGetString(GL_SHADING_LANGUAGE_VERSION);
-    printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
-
-    //Loading shaders
-    CustomShader custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl");
-
-    /////////////////// Reading file ///////////////////
-    unsigned int VAO = readFile("data/cow_up.in");
-
-    printf("min_X: %f\nmax_X: %f\nmin_Y: %f\nmax_Y: %f\nmin_Z: %f\nmax_Z: %f\n", 
-        g_min_X,g_max_X,g_min_Y,g_max_Y,g_min_Z,g_max_Z);
-
-    //Setting size of rendering window
-    glViewport(0, 0, window_width, window_height);
-
-    //Setting callback for buffer size change
-    //glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-    //Getting min and max total
-    ////// MIN /////
-    if(g_min_X < g_min_Y){
-        if(g_min_X < g_min_Z){
-            g_min_total = g_min_X;
-        }else{
-            g_min_total = g_min_Z;
-        }
-    }else{
-        if(g_min_Y < g_min_Z){
-            g_min_total = g_min_Y;
-        }else{
-            g_min_total = g_min_Z;
-        }
-    }
-
-    ///// MAX /////
-    if (g_max_X > g_max_Y){
-        if(g_max_X > g_max_Z){
-            g_max_total = g_max_X;
-        }else{
-            g_max_total = g_max_Z;
-        }
-    }else{
-        if(g_max_Y > g_max_Z){
-            g_max_total = g_max_Y;
-        }else{
-            g_max_total = g_max_Z;
-        }
-    }
-
-
-    //Rendering into the created window
-	while(!glfwWindowShouldClose(window))
-	{
-		//Processing input to close window
-		//processInput(window);
-
-		// Clearing the window background
-		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		// Using GPU Program created
-        //glUseProgram(shaderProgram);
-        custom_shader.use();
-
-		//create transformations
-		glm::mat4 model         = glm::mat4(1.0f);
-        glm::mat4 view          = glm::mat4(1.0f);
-        glm::mat4 projection    = glm::mat4(1.0f);
-
-        float range_x = (g_min_X+g_max_X)/2.0f;
-        float range_y = (g_min_Y+g_max_Y)/2.0f;
-        float range_z = (g_min_Z+g_max_Z)/2.0f;
-
-        //Translating the model to the origin (0,0,0)
-        glm::mat4 trans = glm::translate(model, glm::vec3(-range_x, -range_y, -range_z));
-        model = trans * model;
-
-        //View matrix
-        view = glm::lookAt(glm::vec3(0.0f, 0.0f, g_max_total - g_min_total),
-                            glm::vec3(0.0f,0.0f,0.0f),
-                            glm::vec3(0.0f,1.0f,0.0f));
-
-        projection = glm::perspective(glm::radians(45.0f),
-                                        float(window_width)/float(window_height),
-                                        0.1f, g_max_total - g_min_total);
-
-        // retrieve the matrix uniform locations
-        unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
-        unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
-        unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
-
-        // pass them to the shaders (3 different ways)
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-		//Binding VAO, maybe no need to binding it every time because have only one VAO
-        glBindVertexArray(VAO);
-
-        //Drawing actual triangles
-        glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
-
-		//Swapping buffers
-	    glfwSwapBuffers(window);
-        
-	    //Keyboard and mouse events
-	    glfwPollEvents();    
-	}*/
-}
-
 unsigned int readFile(const char* filename){
-	char ch;
-	int num_triangles, material_count, i, color_index[3];
+    char ch;
+    int num_triangles, material_count, i, color_index[3];
 
-	glm::vec3 ambient[MAX_MATERIAL_COUNT], 
-				diffuse[MAX_MATERIAL_COUNT], 
-				specular[MAX_MATERIAL_COUNT];
+    glm::vec3 ambient[MAX_MATERIAL_COUNT], 
+                diffuse[MAX_MATERIAL_COUNT], 
+                specular[MAX_MATERIAL_COUNT];
 
-	float shine[MAX_MATERIAL_COUNT];
+    float shine[MAX_MATERIAL_COUNT];
 
-	FILE* fp = fopen(filename,"r");
-	if (fp==NULL) { printf("ERROR: unable to open TriObj [%s]!\n",filename); exit(1); }
+    FILE* fp = fopen(filename,"r");
+    if (fp==NULL) { printf("ERROR: unable to open TriObj [%s]!\n",filename); exit(1); }
 
-	// skiping the first line – object’s name
-	fscanf(fp, "%c", &ch);
-	while(ch!= '\n')
-		fscanf(fp, "%c", &ch);
+    // skiping the first line – object’s name
+    fscanf(fp, "%c", &ch);
+    while(ch!= '\n')
+        fscanf(fp, "%c", &ch);
 
-	// read # of triangles
-	fscanf(fp,"# triangles = %d\n", &num_triangles);
-	g_num_triangles = num_triangles; //Setting global variable for number of triangles
-	// read material count
-	fscanf(fp,"Material count = %d\n", &material_count);
+    // read # of triangles
+    fscanf(fp,"# triangles = %d\n", &num_triangles);
+    g_num_triangles = num_triangles; //Setting global variable for number of triangles
+    // read material count
+    fscanf(fp,"Material count = %d\n", &material_count);
 
-	for (i=0; i<material_count; i++) {
-		fscanf(fp, "ambient color %f %f %f\n", &(ambient[i].x), &(ambient[i].y), &(ambient[i].z));
-		fscanf(fp, "diffuse color %f %f %f\n", &(diffuse[i].x), &(diffuse[i].y), &(diffuse[i].z));
-		fscanf(fp, "specular color %f %f %f\n", &(specular[i].x), &(specular[i].y), &(specular[i].z));
-		fscanf(fp, "material shine %f\n", &(shine[i]));
-	}
+    for (i=0; i<material_count; i++) {
+        fscanf(fp, "ambient color %f %f %f\n", &(ambient[i].x), &(ambient[i].y), &(ambient[i].z));
+        fscanf(fp, "diffuse color %f %f %f\n", &(diffuse[i].x), &(diffuse[i].y), &(diffuse[i].z));
+        fscanf(fp, "specular color %f %f %f\n", &(specular[i].x), &(specular[i].y), &(specular[i].z));
+        fscanf(fp, "material shine %f\n", &(shine[i]));
+    }
 
-	// skiping documentation line
-	fscanf(fp, "%c", &ch);
-	while(ch!= '\n')
-		fscanf(fp, "%c", &ch);
+    // skiping documentation line
+    fscanf(fp, "%c", &ch);
+    while(ch!= '\n')
+        fscanf(fp, "%c", &ch);
 
-	// allocate triangles for tri model
-	printf ("Reading in %s (%d triangles). . .\n", filename, num_triangles);
-	struct Triangle Tris[num_triangles];
+    // allocate triangles for tri model
+    printf ("Reading in %s (%d triangles). . .\n", filename, num_triangles);
+    struct Triangle Tris[num_triangles];
 
-	for (i=0; i<num_triangles; i++) { // read triangles
+    //Setting all mins and maxs to zero in order to recalculate them
+    g_min_X=0.0f, g_max_X=0.0f, g_min_Y=0.0f, g_max_Y=0.0f, g_min_Z=0.0f, g_max_Z=0.0f;
 
-		fscanf(fp, "v0 %f %f %f %f %f %f %d\n",
-				&(Tris[i].v0.x), &(Tris[i].v0.y), &(Tris[i].v0.z),
-				&(Tris[i].normal[0].x), &(Tris[i]. normal [0].y), &(Tris[i]. normal [0].z),
-				&(color_index[0]));
+    for (i=0; i<num_triangles; i++) { // read triangles
 
-        //Pushing indices if there no exists already in list_indices
-        it = std::find(list_indices.begin(), list_indices.end(), Tris[i].v0);
-        if(it == list_indices.end())
-            list_indices.push_back(Tris[i].v0);
-
-        //Pushing index positions in list_positions
-        list_positions.push_back(Tris[i].v0);
-		
-		fscanf(fp, "v1 %f %f %f %f %f %f %d\n",
-				&(Tris[i].v1.x), &(Tris[i].v1.y), &(Tris[i].v1.z),
-				&(Tris[i].normal[1].x), &(Tris[i].normal[1].y), &(Tris[i].normal[1].z),
-				&(color_index[1]));
-
-        //Pushing indices if there no exists already in list_indices
-        it = std::find(list_indices.begin(), list_indices.end(), Tris[i].v1);
-        if(it == list_indices.end())
-            list_indices.push_back(Tris[i].v1);
-
-        //Pushing index positions in list_positions
-        list_positions.push_back(Tris[i].v1);
-		
-		fscanf(fp, "v2 %f %f %f %f %f %f %d\n",
-				&(Tris[i].v2.x), &(Tris[i].v2.y), &(Tris[i].v2.z),
-				&(Tris[i].normal[2].x), &(Tris[i].normal[2].y), &(Tris[i].normal[2].z),&(color_index[2]));
-
-        //Pushing indices if there no exists already in list_indices
-        it = std::find(list_indices.begin(), list_indices.end(), Tris[i].v2);
-        if(it == list_indices.end())
-            list_indices.push_back(Tris[i].v2);
-
-        //Pushing index positions in list_positions
-        list_positions.push_back(Tris[i].v2);
-		
-		fscanf(fp, "face normal %f %f %f\n", &(Tris[i].face_normal.x), &(Tris[i].face_normal.y),
-				&(Tris[i].face_normal.z));
-		
-		Tris[i].Color[0] = (unsigned char)(int)(255*(diffuse[color_index[0]].x));
-		Tris[i].Color[1] = (unsigned char)(int)(255*(diffuse[color_index[1]].y));
-		Tris[i].Color[2] = (unsigned char)(int)(255*(diffuse[color_index[2]].z));
+        fscanf(fp, "v0 %f %f %f %f %f %f %d\n",
+                &(Tris[i].v0.x), &(Tris[i].v0.y), &(Tris[i].v0.z),
+                &(Tris[i].normal[0].x), &(Tris[i]. normal [0].y), &(Tris[i]. normal [0].z),
+                &(color_index[0]));
+        
+        fscanf(fp, "v1 %f %f %f %f %f %f %d\n",
+                &(Tris[i].v1.x), &(Tris[i].v1.y), &(Tris[i].v1.z),
+                &(Tris[i].normal[1].x), &(Tris[i].normal[1].y), &(Tris[i].normal[1].z),
+                &(color_index[1]));
+        
+        fscanf(fp, "v2 %f %f %f %f %f %f %d\n",
+                &(Tris[i].v2.x), &(Tris[i].v2.y), &(Tris[i].v2.z),
+                &(Tris[i].normal[2].x), &(Tris[i].normal[2].y), &(Tris[i].normal[2].z),&(color_index[2]));
+        
+        fscanf(fp, "face normal %f %f %f\n", &(Tris[i].face_normal.x), &(Tris[i].face_normal.y),
+                &(Tris[i].face_normal.z));
+        
+        Tris[i].Color[0] = (unsigned char)(int)(255*(diffuse[color_index[0]].x));
+        Tris[i].Color[1] = (unsigned char)(int)(255*(diffuse[color_index[1]].y));
+        Tris[i].Color[2] = (unsigned char)(int)(255*(diffuse[color_index[2]].z));
 
         //Getting min and max for X axis
         if(Tris[i].v0.x < g_min_X){
@@ -654,45 +410,45 @@ unsigned int readFile(const char* filename){
         if(Tris[i].v2.z > g_max_Z){
             g_max_Z = Tris[i].v2.z;
         }
-	}
+    }
 
-	fclose(fp);
+    fclose(fp);
 
-	//Saving triangles information into vertex buffer objects
-	/*float vert[9*num_triangles];
-	float vert_normal[9*num_triangles];
+    //Saving triangles information into vertex buffer objects
+    float vert[9*num_triangles];
+    float vert_normal[9*num_triangles];
     float color_triangle[3*num_triangles];
 
-	for(i=0; i < num_triangles; i++){
-		vert[9*i] = Tris[i].v0.x;
-		vert[9*i+1] = Tris[i].v0.y;
-		vert[9*i+2] = Tris[i].v0.z;
-		vert[9*i+3] = Tris[i].v1.x;
-		vert[9*i+4] = Tris[i].v1.y;
-		vert[9*i+5] = Tris[i].v1.z;
-		vert[9*i+6] = Tris[i].v2.x;
-		vert[9*i+7] = Tris[i].v2.y;
-		vert[9*i+8] = Tris[i].v2.z;
+    for(i=0; i < num_triangles; i++){
+        vert[9*i] = Tris[i].v0.x;
+        vert[9*i+1] = Tris[i].v0.y;
+        vert[9*i+2] = Tris[i].v0.z;
+        vert[9*i+3] = Tris[i].v1.x;
+        vert[9*i+4] = Tris[i].v1.y;
+        vert[9*i+5] = Tris[i].v1.z;
+        vert[9*i+6] = Tris[i].v2.x;
+        vert[9*i+7] = Tris[i].v2.y;
+        vert[9*i+8] = Tris[i].v2.z;
 
         //Color coordinates
         color_triangle[3*i] = Tris[i].Color[0];
         color_triangle[3*i+1] = Tris[i].Color[1];
         color_triangle[3*i+2] = Tris[i].Color[2];
 
-		//Vertex normal coordinates
-		vert_normal[9*i] = Tris[i].normal[0].x;
-		vert_normal[9*i+1] = Tris[i].normal[0].y;
-		vert_normal[9*i+2] = Tris[i].normal[0].z;
-		vert_normal[9*i+3] = Tris[i].normal[1].x;
-		vert_normal[9*i+4] = Tris[i].normal[1].y;
-		vert_normal[9*i+5] = Tris[i].normal[1].z;
-		vert_normal[9*i+6] = Tris[i].normal[2].x;
-		vert_normal[9*i+7] = Tris[i].normal[2].y;
-		vert_normal[9*i+8] = Tris[i].normal[2].z;
-	}
+        //Vertex normal coordinates
+        vert_normal[9*i] = Tris[i].normal[0].x;
+        vert_normal[9*i+1] = Tris[i].normal[0].y;
+        vert_normal[9*i+2] = Tris[i].normal[0].z;
+        vert_normal[9*i+3] = Tris[i].normal[1].x;
+        vert_normal[9*i+4] = Tris[i].normal[1].y;
+        vert_normal[9*i+5] = Tris[i].normal[1].z;
+        vert_normal[9*i+6] = Tris[i].normal[2].x;
+        vert_normal[9*i+7] = Tris[i].normal[2].y;
+        vert_normal[9*i+8] = Tris[i].normal[2].z;
+    }
 
-	//Defining VAO
-	unsigned int VBO, VBO_color, VAO;
+    //Defining VAO
+    unsigned int VBO, VBO_color, VAO;
     glGenVertexArrays(1, &VAO);
     
     // binding the Vertex Array Object.
@@ -712,7 +468,7 @@ unsigned int readFile(const char* filename){
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     /////////////  Binding buffer for vertex VBO_color //////////////////////
-    glGenBuffers(1, &VBO_color);
+    /*glGenBuffers(1, &VBO_color);
     glBindBuffer(GL_ARRAY_BUFFER, VBO_color);
     //Putting buffer data
     glBufferData(GL_ARRAY_BUFFER, num_triangles*3*sizeof(GL_FLOAT), color_triangle, GL_STATIC_DRAW);
@@ -721,21 +477,36 @@ unsigned int readFile(const char* filename){
     //Setting 0 in position (according to the specification on the shader)
     glEnableVertexAttribArray(1);
     //Unbinding the VBO buffer
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);*/
 
     //Unbinding VAO
     glBindVertexArray(0);
 
-    return VAO;*/
-    return 0;
+    return VAO;
 }
 
-Matrix4f toEigenMatrix(glm::mat4& matrix){
-    Matrix4f eigen_matrix;
-    
-    for(int i = 0; i < 4; i++)
-        for(int j = 0; j < 4; j++)
-            eigen_matrix(i,j) = matrix[j][i];
+int main(){
 
-    return eigen_matrix;
+    try{
+        nanogui::init();
+        
+        // scoped variables
+        {
+            nanogui::ref<App> app = new App();
+            //Indicating that current context will be window recently created
+            app->drawAll();
+            app->setVisible(true);
+            nanogui::mainloop();
+        }
+
+        nanogui::shutdown();
+    }catch (const std::runtime_error &e) {
+        std::string error_msg = std::string("Caught a fatal error: ") + std::string(e.what());
+        #if defined(_WIN32)
+            MessageBoxA(nullptr, error_msg.c_str(), NULL, MB_ICONERROR | MB_OK);
+        #else
+            std::cerr << error_msg << endl;
+        #endif
+        return -1;
+    }
 }

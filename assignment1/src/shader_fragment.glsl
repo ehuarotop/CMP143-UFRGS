@@ -5,5 +5,5 @@ uniform vec4 rasterizer_color;
 out vec4 FragColor;
 
 void main(){
-	FragColor = rasterizer_color;
+	FragColor = vec4(1.0);
 }
