@@ -59,23 +59,16 @@ using namespace nanogui;
 //calback for resizing window
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 //callback for processing input
-void processInput(GLFWwindow *window);
+//void processInput(GLFWwindow *window);
 //function to read files with extension .in (models)
 unsigned int readFile(const char* filename);
 
 ///////////////////////// GLOBAL VARIABLES /////////////////////////
-//// NANOGUI ////
-//Screen *screen = nullptr;
-MatrixXu indices;
-MatrixXf positions;
-
 //// DATA ////
-//MatrixXf positions;
 float g_min_X=0.0f, g_max_X=0.0f, g_min_Y=0.0f, g_max_Y=0.0f, g_min_Z=0.0f, g_max_Z=0.0f;
 float g_min_total=0.0f, g_max_total=0.0f;
 const int MAX_MATERIAL_COUNT = 1; //Defining constant for max number of materials in input file.
 int g_num_triangles = 0;
-
 
 //Defining struct for triangle
 struct Triangle {
@@ -87,12 +80,21 @@ struct Triangle {
 //Defining a canvas class where objects will be rendered
 class MyGLCanvas : public GLCanvas{
 public:
-
+    //what model is being rendered at the moment (0:none, 1:cube, 2:cow)
     int model_used;
+    glm::vec3 cameraPos;
+    glm::vec3 cameraFront;
+    glm::vec3 cameraUp;
+    float deltaTime = 0.0f; // time between current frame and last frame
+    float lastFrame = 0.0f;
 
     MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl"){
 
+        //Setting initial color to white
         this->color = glm::vec4(1.0f);
+
+        //Setting initial drawing mode to 3 -> solid polygons
+        this->drawing_mode = 3;
 
         //Reading file with the information corresponding to the cube
         custom_shader.use();
@@ -104,11 +106,6 @@ public:
     void setModel(const char* filename){
         this->model_filename = filename;
         VAO = readFile(model_filename);
-
-        if (filename == "data/cube.in")
-            model_used = 1;
-        else if (filename == "data/cow_up.in")
-            model_used = 2;
 
         //Getting min and max total
         ////// MIN /////
@@ -141,15 +138,25 @@ public:
             }
         }
 
-        printf("min_X: %f\nmax_X: %f\nmin_Y: %f\nmax_Y: %f\nmin_Z: %f\nmax_Z: %f\n", 
-        g_min_X,g_max_X,g_min_Y,g_max_Y,g_min_Z,g_max_Z);
-
-        cout<<g_max_total<<"\n";
-        cout<<g_min_total<<"\n";
+        if (filename == "data/cube.in"){
+            model_used = 1;
+            this->cameraPos = glm::vec3(0.0f, 0.0f, 4.0f);
+            this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
+            this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
+        } else if (filename == "data/cow_up.in") {
+            model_used = 2;
+            this->cameraPos = glm::vec3(0.0f, 0.0f, g_max_total - g_min_total);
+            this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
+            this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
+        }
     }
 
     void setColor(glm::vec4 choosen_color){
         this->color = choosen_color;
+    }
+
+    void setDrawingMode(unsigned int drawing_mode){
+        this->drawing_mode = drawing_mode;
     }
 
     /*~MyGLCanvas() {
@@ -157,6 +164,10 @@ public:
     }*/
 
     virtual void drawGL() override {
+
+        float currentFrame = glfwGetTime();
+        this->deltaTime = currentFrame - this->lastFrame;
+        this->lastFrame = currentFrame;
 
         if (model_used == 0){
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -178,15 +189,9 @@ public:
             glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-center_x, -center_y, -center_z));
             model = trans * model;
 
-            //View matrix
-            if(model_used == 1)
-                view = glm::lookAt(glm::vec3(0.0f, 0.0f, 4.0f),
-                               glm::vec3(0.0f,0.0f,0.0f),
-                               glm::vec3(0.0f,1.0f,0.0f));
-            else if (model_used == 2)
-                view = glm::lookAt(glm::vec3(0.0f, 0.0f, g_max_total - g_min_total),
-                               glm::vec3(0.0f,0.0f,0.0f),
-                               glm::vec3(0.0f,1.0f,0.0f));
+            view = glm::lookAt(this->cameraPos,
+                               this->cameraFront,
+                               this->cameraUp);
 
             projection = glm::perspective(glm::radians(45.0f),
                                             ((float)this->width())/this->height(),
@@ -208,7 +213,15 @@ public:
 
             glEnable(GL_DEPTH_TEST);
 
-            glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
+            if(drawing_mode == 1)
+                glDrawArrays(GL_POINTS, 0, g_num_triangles*3);
+            else if (drawing_mode == 2){
+                glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+                glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
+                glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+            }
+            else if (drawing_mode == 3)
+                glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
             
             //Keyboard and mouse events
             glfwPollEvents();
@@ -222,6 +235,7 @@ private:
     CustomShader custom_shader;
     const char* model_filename;
     glm::vec4 color;
+    unsigned int drawing_mode;
 };
 
 
@@ -275,14 +289,21 @@ public:
         ColorWheel *colorwheel = new ColorWheel(tools);
         colorwheel->setCallback([this](const Color &c){
             glm::vec4 choosen_color = glm::vec4(c.r(), c.g(), c.b(), c.w());
-
             mCanvasObject->setColor(choosen_color);
+        });
 
-            /*std::cout << "ColorPicker Final Callback: ["
-                           << c.r() << ", "
-                           << c.g() << ", "
-                           << c.b() << ", "
-                           << c.w() << "]" << std::endl;*/
+        new Label(tools, "Drawing mode", "sans-bold");
+        Button *draw_points = new Button(tools, "Points");
+        draw_points->setCallback([this](){
+            mCanvasObject->setDrawingMode(1);
+        });
+        Button *draw_wireframe = new Button(tools, "Wireframes");
+        draw_wireframe->setCallback([this](){
+            mCanvasObject->setDrawingMode(2);
+        });
+        Button *draw_polygon = new Button(tools, "Solid Polygons");
+        draw_polygon->setCallback([this](){
+            mCanvasObject->setDrawingMode(3);
         });
 
         performLayout();
@@ -295,6 +316,19 @@ public:
             setVisible(false);
             return true;
         }
+
+        float cameraSpeed = 0.5 * mCanvasObject->deltaTime;
+        if (key == GLFW_KEY_W && action == GLFW_PRESS)
+            mCanvasObject->cameraPos += cameraSpeed * mCanvasObject->cameraFront;
+        if (key == GLFW_KEY_S && action == GLFW_PRESS)
+            mCanvasObject->cameraPos -= cameraSpeed * mCanvasObject->cameraFront;
+        if (key == GLFW_KEY_A && action == GLFW_PRESS)
+            mCanvasObject->cameraPos -= glm::normalize(glm::cross(mCanvasObject->cameraFront, 
+                                                            mCanvasObject->cameraUp)) * cameraSpeed;
+        if (key == GLFW_KEY_D && action == GLFW_PRESS)
+            mCanvasObject->cameraPos += glm::normalize(glm::cross(mCanvasObject->cameraFront, 
+                                                            mCanvasObject->cameraUp)) * cameraSpeed;
+
         return false;
     }
 
