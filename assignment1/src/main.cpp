@@ -92,6 +92,8 @@ public:
 
     MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl"){
 
+        this->color = glm::vec4(1.0f);
+
         //Reading file with the information corresponding to the cube
         custom_shader.use();
         if (model_filename != "data/cube.in" && model_filename != "data/cow_up.in")
@@ -146,6 +148,10 @@ public:
         cout<<g_min_total<<"\n";
     }
 
+    void setColor(glm::vec4 choosen_color){
+        this->color = choosen_color;
+    }
+
     /*~MyGLCanvas() {
         mShader.free();
     }*/
@@ -190,11 +196,13 @@ public:
             unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
             unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
             unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
+            unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
 
             // pass them to the shaders (3 different ways)
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
             glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+            glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
 
             glBindVertexArray(VAO);
 
@@ -213,6 +221,7 @@ private:
     unsigned int VAO;
     CustomShader custom_shader;
     const char* model_filename;
+    glm::vec4 color;
 };
 
 
@@ -249,6 +258,8 @@ public:
         tools->setLayout(new BoxLayout(Orientation::Vertical,
                                        Alignment::Fill, 0, 6));
 
+        new Label(tools, "Loading models", "sans-bold");
+
         Button *load_cube = new Button(tools, "Load cube object");
         load_cube->setCallback([this](){
             mCanvasObject->setModel("data/cube.in");
@@ -257,6 +268,21 @@ public:
         Button *load_cow = new Button(tools, "Load Cow object");
         load_cow->setCallback([this](){
             mCanvasObject->setModel("data/cow_up.in");
+        });
+
+        new Label(tools, "Choose a color", "sans-bold");
+
+        ColorWheel *colorwheel = new ColorWheel(tools);
+        colorwheel->setCallback([this](const Color &c){
+            glm::vec4 choosen_color = glm::vec4(c.r(), c.g(), c.b(), c.w());
+
+            mCanvasObject->setColor(choosen_color);
+
+            /*std::cout << "ColorPicker Final Callback: ["
+                           << c.r() << ", "
+                           << c.g() << ", "
+                           << c.b() << ", "
+                           << c.w() << "]" << std::endl;*/
         });
 
         performLayout();
