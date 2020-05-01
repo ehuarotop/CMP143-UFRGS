@@ -70,6 +70,14 @@ float g_min_total=0.0f, g_max_total=0.0f;
 const int MAX_MATERIAL_COUNT = 1; //Defining constant for max number of materials in input file.
 int g_num_triangles = 0;
 
+////////NANOGUI///////////
+bool firstMouse = true;
+float yaw   = -90.0f;   // yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right so we initially rotate a bit to the left.
+float pitch =  0.0f;
+float lastX =  500.0f / 2.0;
+float lastY =  500.0 / 2.0;
+float fov   =  45.0f;
+
 //Defining struct for triangle
 struct Triangle {
     glm::vec3 v0, v1, v2, face_normal;
@@ -159,9 +167,70 @@ public:
         this->drawing_mode = drawing_mode;
     }
 
+    void setCullingOrientation(unsigned int culling_orientation){
+        this->culling_orientation = culling_orientation;
+    }
+
     /*~MyGLCanvas() {
         mShader.free();
     }*/
+
+    virtual bool scrollEvent(const Vector2i &p, const Vector2f &rel){
+        if (fov >= 1.0f && fov <= 45.0f)
+            fov -= rel.y();
+        if (fov <= 1.0f)
+            fov = 1.0f;
+        if (fov >= 45.0f)
+            fov = 45.0f;
+    }
+
+    virtual bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers){
+        if (button == GLFW_MOUSE_BUTTON_3) {
+            cout<<"Middle button was pressed\n";
+            return true;
+        }
+        return false;
+    }
+
+    virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
+        //cout<<"p->posx:"<<p.x()<<",posy:"<<p.y()<<"\n";
+
+        //If the mouse is moved for the very first time
+        if(firstMouse){
+            lastX = p.x();
+            lastY = p.y();
+            firstMouse = false;
+        }
+
+        float xoffset = p.x() - lastX;
+        float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
+        lastX = p.x();
+        lastY = p.y();
+
+        float sensitivity = 0.5f; // change this value to your liking
+        xoffset *= sensitivity;
+        yoffset *= sensitivity;
+
+        yaw += xoffset;
+        pitch += yoffset;
+
+        // make sure that when pitch is out of bounds, screen doesn't get flipped
+        if (pitch > 89.0f)
+            pitch = 89.0f;
+        if (pitch < -89.0f)
+            pitch = -89.0f;
+
+        glm::vec3 front;
+        front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        front.y = sin(glm::radians(pitch));
+        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        //cameraFront = glm::normalize(front);
+
+        this->cameraFront = glm::normalize(front);
+
+        return false;
+
+    }
 
     virtual void drawGL() override {
 
@@ -193,9 +262,9 @@ public:
                                this->cameraFront,
                                this->cameraUp);
 
-            projection = glm::perspective(glm::radians(45.0f),
+            projection = glm::perspective(glm::radians(fov),
                                             ((float)this->width())/this->height(),
-                                            0.1f, g_max_total - g_min_total);
+                                            1.0f, 3000.0f);
 
             // retrieve the matrix uniform locations
             unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
@@ -211,6 +280,16 @@ public:
 
             glBindVertexArray(VAO);
 
+            if(culling_orientation == 1){
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_FRONT);
+                glFrontFace(GL_CW); 
+            }else if (culling_orientation == 2){
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_FRONT);
+                glFrontFace(GL_CCW);
+            }
+
             glEnable(GL_DEPTH_TEST);
 
             if(drawing_mode == 1)
@@ -223,9 +302,6 @@ public:
             else if (drawing_mode == 3)
                 glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
             
-            //Keyboard and mouse events
-            glfwPollEvents();
-            
             glDisable(GL_DEPTH_TEST);
         }
     }
@@ -236,8 +312,8 @@ private:
     const char* model_filename;
     glm::vec4 color;
     unsigned int drawing_mode;
+    unsigned int culling_orientation;
 };
-
 
 class App : public nanogui::Screen {
 public:
@@ -245,7 +321,7 @@ public:
     Window *window;
     Window *windowGUI;
 
-    App() : nanogui::Screen(Eigen::Vector2i(800, 600), "Programming Assignment 1", false) {
+    App() : nanogui::Screen(Eigen::Vector2i(800, 650), "Programming Assignment 1", false) {
         using namespace nanogui;
 
         // Printing to terminal opengl and glsl version
@@ -292,6 +368,27 @@ public:
             mCanvasObject->setColor(choosen_color);
         });
 
+        new Label(tools, "Near Plane", "sans-bold");
+
+        TextBox *textBox_np = new TextBox(tools);
+        textBox_np->setFixedSize(Vector2i(80, 25));
+        textBox_np->setValue("1.0");
+        textBox_np->setUnits("f");
+        textBox_np->setEditable(true);
+        textBox_np->setFontSize(16);
+        textBox_np->setFormat("[-]?[0-9]*\\.?[0-9]+");
+        textBox_np->setCallback([](const std::string &text_value){
+            cout<<text_value<<"\n";
+            return true;
+        });
+
+        new Label(tools, "Far Plane", "sans-bold");
+
+        TextBox *textBox_fp = new TextBox(tools);
+        textBox_fp->setFixedSize(Vector2i(80, 25));
+        textBox_fp->setValue("1000");
+        textBox_fp->setUnits("f");
+
         new Label(tools, "Drawing mode", "sans-bold");
         Button *draw_points = new Button(tools, "Points");
         draw_points->setCallback([this](){
@@ -306,6 +403,17 @@ public:
             mCanvasObject->setDrawingMode(3);
         });
 
+
+        new Label(tools, "Culling Orientation", "sans-bold");
+        Button *clockwise = new Button(tools, "Clockwise");
+        clockwise->setCallback([this](){
+            mCanvasObject->setCullingOrientation(1);
+        });
+        Button *counter_clockwise = new Button(tools, "Counter Clockwise");
+        counter_clockwise->setCallback([this](){
+            mCanvasObject->setCullingOrientation(2);
+        });
+
         performLayout();
     }
 
@@ -317,7 +425,7 @@ public:
             return true;
         }
 
-        float cameraSpeed = 0.5 * mCanvasObject->deltaTime;
+        /*float cameraSpeed = 0.5 * mCanvasObject->deltaTime;
         if (key == GLFW_KEY_W && action == GLFW_PRESS)
             mCanvasObject->cameraPos += cameraSpeed * mCanvasObject->cameraFront;
         if (key == GLFW_KEY_S && action == GLFW_PRESS)
@@ -327,7 +435,7 @@ public:
                                                             mCanvasObject->cameraUp)) * cameraSpeed;
         if (key == GLFW_KEY_D && action == GLFW_PRESS)
             mCanvasObject->cameraPos += glm::normalize(glm::cross(mCanvasObject->cameraFront, 
-                                                            mCanvasObject->cameraUp)) * cameraSpeed;
+                                                            mCanvasObject->cameraUp)) * cameraSpeed;*/
 
         return false;
     }
