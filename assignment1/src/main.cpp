@@ -157,7 +157,7 @@ public:
             this->cameraPos = glm::vec3(0.0f, 0.0f, 5.0f);
             this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
             this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
-            translateCamZ = 5.0f;
+            translateCamZ = 0.0f;
             translateCamX = 0.0f;
             translateCamY = 0.0f;
         } else if (filename == "data/cow_up.in") {
@@ -165,7 +165,7 @@ public:
             this->cameraPos = glm::vec3(0.0f, 0.0f, g_max_total - g_min_total);
             this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
             this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
-            translateCamZ = g_max_total - g_min_total;
+            translateCamZ = 0.0f;//g_max_total - g_min_total;
             translateCamX = 0.0f;
             translateCamY = 0.0f;
         }
@@ -273,20 +273,76 @@ public:
             model = trans * model;
 
             if(firstMouse){
-                view = glm::lookAt(this->cameraPos,
+
+                /*view = glm::lookAt(this->cameraPos,
+                           this->cameraFront,
+                           this->cameraUp);*/
+
+                /*glm::mat4 translate_t = glm::translate(glm::mat4(1.0f), glm::vec3(-translateCamX, 
+                                                        -translateCamY, 
+                                                        -translateCamZ));*/
+
+                glm::vec3 new_pos = glm::vec3(cameraPos.x - translateCamX, 
+                                                cameraPos.y - translateCamY,
+                                                cameraPos.z - translateCamZ);
+
+                new_pos = glm::normalize(new_pos)*(glm::length(cameraPos));
+
+                view = glm::lookAt(new_pos,
                            this->cameraFront,
                            this->cameraUp);
-                view = glm::translate(view, glm::vec3(this->cameraPos.x - translateCamX, 
-                                                        this->cameraPos.y - translateCamY, 
-                                                        this->cameraPos.z-translateCamZ));
+
+                cameraPos = new_pos;
+                translateCamX = 0.0f;
+                translateCamY = 0.0f;
+                translateCamZ = 0.0f;
+                
             } else {
-                view = glm::lookAt(this->cameraPos,
+
+                cout<<cameraPos.x<<"\n";
+                cout<<cameraPos.y<<"\n";
+                cout<<cameraPos.z<<"\n";
+
+                /*glm::mat4 translate_t = glm::translate(glm::mat4(1.0f), glm::vec3(-translateCamX, 
+                                                        -translateCamY, 
+                                                        -translateCamZ));
+
+                glm::vec3 aux = glm::vec3(translate_t*glm::vec4(this->cameraPos, 1.0f));
+
+                view = glm::lookAt(glm::vec3(translate_t*glm::vec4(this->cameraPos, 1.0f)),
+                           this->cameraFront,
+                           this->cameraUp);*/
+
+                glm::vec3 new_pos = glm::vec3(cameraPos.x - translateCamX, 
+                                                cameraPos.y - translateCamY,
+                                                cameraPos.z - translateCamZ);
+
+                new_pos = glm::normalize(new_pos)*(glm::length(cameraPos));
+
+                view = glm::lookAt(new_pos,
+                           this->cameraFront,
+                           this->cameraUp);
+
+
+                cameraPos = new_pos;
+                translateCamX = 0.0f;
+                translateCamY = 0.0f;
+                translateCamZ = 0.0f;
+                
+
+                cout<<new_pos.x<<"\n";
+                cout<<new_pos.y<<"\n";
+                cout<<new_pos.z<<"\n";
+
+                cout<<"-------------\n";
+
+                /*view = glm::lookAt(this->cameraPos,
                            this->cameraFront,
                            this->cameraUp);
 
                 view = glm::translate(view, glm::vec3(this->cameraPos.x - translateCamX, 
                                                         this->cameraPos.y - translateCamY, 
-                                                        this->cameraPos.z-translateCamZ));
+                                                        this->cameraPos.z-translateCamZ));*/
                 view = glm::rotate(view, pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
                 view = glm::rotate(view, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
