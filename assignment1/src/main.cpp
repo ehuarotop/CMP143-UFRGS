@@ -77,6 +77,9 @@ float pitch =  0.0f;
 float lastX =  500.0f / 2.0;
 float lastY =  500.0 / 2.0;
 float fov   =  45.0f;
+std::string text_textBox = "";
+
+int focus_near_far_plane = 0;
 
 //Defining struct for triangle
 struct Triangle {
@@ -148,7 +151,7 @@ public:
 
         if (filename == "data/cube.in"){
             model_used = 1;
-            this->cameraPos = glm::vec3(0.0f, 0.0f, 4.0f);
+            this->cameraPos = glm::vec3(0.0f, 0.0f, 5.0f);
             this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
             this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
         } else if (filename == "data/cow_up.in") {
@@ -204,15 +207,18 @@ public:
 
         float xoffset = p.x() - lastX;
         float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
+        //float yoffset = p.y() - p.y();
         lastX = p.x();
         lastY = p.y();
 
-        float sensitivity = 0.5f; // change this value to your liking
+        float sensitivity = 0.01f; // change this value to your liking
         xoffset *= sensitivity;
         yoffset *= sensitivity;
 
         yaw += xoffset;
         pitch += yoffset;
+
+        //cout<<"yaw:"<<yaw<<",pitch:"<<pitch<<"\n";
 
         // make sure that when pitch is out of bounds, screen doesn't get flipped
         if (pitch > 89.0f)
@@ -220,13 +226,17 @@ public:
         if (pitch < -89.0f)
             pitch = -89.0f;
 
-        glm::vec3 front;
+        /*while(yaw < -180)
+            yaw += 360;
+        while(yaw > 180)
+            yaw -= 360;*/
+
+        /*glm::vec3 front;
         front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
         front.y = sin(glm::radians(pitch));
         front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-        //cameraFront = glm::normalize(front);
 
-        this->cameraFront = glm::normalize(front);
+        this->cameraFront = glm::normalize(front);*/
 
         return false;
 
@@ -259,8 +269,11 @@ public:
             model = trans * model;
 
             view = glm::lookAt(this->cameraPos,
-                               this->cameraFront,
-                               this->cameraUp);
+                           this->cameraFront,
+                           this->cameraUp);
+
+            view = glm::rotate(view, pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+            view = glm::rotate(view, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
 
             projection = glm::perspective(glm::radians(fov),
                                             ((float)this->width())/this->height(),
@@ -315,11 +328,36 @@ private:
     unsigned int culling_orientation;
 };
 
+class MyTextBox : public nanogui::TextBox{
+public:
+
+    bool isFocused = false;
+
+    MyTextBox(Widget *parent) : nanogui::TextBox(parent){
+
+    }
+
+    virtual bool focusEvent(bool focused){
+        if (focused){
+            this->setValue("");
+            isFocused = true;
+        }else{
+            isFocused = false;
+            text_textBox = "";
+        }
+    }
+
+private:
+    int type;
+};
+
 class App : public nanogui::Screen {
 public:
 
     Window *window;
     Window *windowGUI;
+    MyTextBox *textBox_np;
+    MyTextBox *textBox_fp;
 
     App() : nanogui::Screen(Eigen::Vector2i(800, 650), "Programming Assignment 1", false) {
         using namespace nanogui;
@@ -370,24 +408,25 @@ public:
 
         new Label(tools, "Near Plane", "sans-bold");
 
-        TextBox *textBox_np = new TextBox(tools);
-        textBox_np->setFixedSize(Vector2i(80, 25));
+        textBox_np = new MyTextBox(tools);
+        textBox_np->setFixedSize(Vector2i(200, 25));
         textBox_np->setValue("1.0");
         textBox_np->setUnits("f");
-        textBox_np->setEditable(true);
         textBox_np->setFontSize(16);
         textBox_np->setFormat("[-]?[0-9]*\\.?[0-9]+");
-        textBox_np->setCallback([](const std::string &text_value){
+        /*textBox_np->setCallback([](const std::string &text_value){
             cout<<text_value<<"\n";
             return true;
-        });
+        });*/
 
         new Label(tools, "Far Plane", "sans-bold");
 
-        TextBox *textBox_fp = new TextBox(tools);
-        textBox_fp->setFixedSize(Vector2i(80, 25));
-        textBox_fp->setValue("1000");
+        textBox_fp = new MyTextBox(tools);
+        textBox_fp->setFixedSize(Vector2i(200, 25));
+        textBox_fp->setValue("1000.0");
         textBox_fp->setUnits("f");
+        textBox_fp->setFontSize(16);
+        textBox_fp->setFormat("[-]?[0-9]*\\.?[0-9]+");
 
         new Label(tools, "Drawing mode", "sans-bold");
         Button *draw_points = new Button(tools, "Points");
@@ -418,6 +457,7 @@ public:
     }
 
     virtual bool keyboardEvent(int key, int scancode, int action, int modifiers) {
+
         if (Screen::keyboardEvent(key, scancode, action, modifiers))
             return true;
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -425,17 +465,38 @@ public:
             return true;
         }
 
-        /*float cameraSpeed = 0.5 * mCanvasObject->deltaTime;
-        if (key == GLFW_KEY_W && action == GLFW_PRESS)
-            mCanvasObject->cameraPos += cameraSpeed * mCanvasObject->cameraFront;
-        if (key == GLFW_KEY_S && action == GLFW_PRESS)
-            mCanvasObject->cameraPos -= cameraSpeed * mCanvasObject->cameraFront;
-        if (key == GLFW_KEY_A && action == GLFW_PRESS)
-            mCanvasObject->cameraPos -= glm::normalize(glm::cross(mCanvasObject->cameraFront, 
-                                                            mCanvasObject->cameraUp)) * cameraSpeed;
-        if (key == GLFW_KEY_D && action == GLFW_PRESS)
-            mCanvasObject->cameraPos += glm::normalize(glm::cross(mCanvasObject->cameraFront, 
-                                                            mCanvasObject->cameraUp)) * cameraSpeed;*/
+        if (key >= 46 && key <= 57 && action == GLFW_PRESS){
+            cout<<textBox_np->isFocused<<"\n";
+            cout<<textBox_fp->isFocused<<"\n";
+            if(textBox_np->isFocused || textBox_fp->isFocused){
+                if (key == 48)
+                    text_textBox += "0";
+                else if (key == 49)
+                    text_textBox += "1";
+                else if (key == 50)
+                    text_textBox += "2";
+                else if (key == 51)
+                    text_textBox += "3";
+                else if (key == 52)
+                    text_textBox += "4";
+                else if (key == 53)
+                    text_textBox += "5";
+                else if (key == 54)
+                    text_textBox += "6";
+                else if (key == 55)
+                    text_textBox += "7";
+                else if (key == 56)
+                    text_textBox += "8";
+                else if (key == 57)
+                    text_textBox += "9";
+                else if (key == 46)
+                    text_textBox += ".";
+
+                cout<<text_textBox<<"\n";
+            }
+
+            return true;
+        }
 
         return false;
     }
@@ -447,7 +508,7 @@ public:
 
 private:
     MyGLCanvas *mCanvasObject;
-    //MyGLCanvas *mCanvasGUI;
+    MyGLCanvas *mCanvasGUI;
 };
 
 unsigned int readFile(const char* filename){
