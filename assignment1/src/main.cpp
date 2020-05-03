@@ -81,8 +81,8 @@ float translateCamX = 0.0f;
 float translateCamY = 0.0f;
 float fov   =  45.0f;
 std::string text_textBox = "";
-
-int focus_near_far_plane = 0;
+float g_near_plane = 1.0f;
+float g_far_plane = 3000.0f;
 
 //Defining struct for triangle
 struct Triangle {
@@ -229,18 +229,11 @@ public:
         yaw += xoffset;
         pitch += yoffset;
 
-        //cout<<"yaw:"<<yaw<<",pitch:"<<pitch<<"\n";
-
         // make sure that when pitch is out of bounds, screen doesn't get flipped
         if (pitch > 89.0f)
             pitch = 89.0f;
         if (pitch < -89.0f)
             pitch = -89.0f;
-
-        /*while(yaw < -180)
-            yaw += 360;
-        while(yaw > 180)
-            yaw -= 360;*/
 
         /*glm::vec3 front;
         front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
@@ -300,7 +293,7 @@ public:
 
             projection = glm::perspective(glm::radians(fov),
                                             ((float)this->width())/this->height(),
-                                            1.0f, 3000.0f);
+                                            g_near_plane, g_far_plane);
 
             // retrieve the matrix uniform locations
             unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
@@ -354,7 +347,7 @@ private:
 class MyTextBox : public nanogui::TextBox{
 public:
 
-    bool isFocused = false;
+    //bool isFocused = false;
 
     MyTextBox(Widget *parent) : nanogui::TextBox(parent){
 
@@ -363,9 +356,11 @@ public:
     virtual bool focusEvent(bool focused){
         if (focused){
             this->setValue("");
-            isFocused = true;
+            //isFocused = true;
+            this->setFocused(true);
         }else{
-            isFocused = false;
+            //isFocused = false;
+            this->setFocused(false);
             text_textBox = "";
         }
     }
@@ -436,17 +431,23 @@ public:
         textBox_np->setValue("1.0");
         textBox_np->setUnits("f");
         textBox_np->setFontSize(16);
-        textBox_np->setFormat("[-]?[0-9]*\\.?[0-9]+");
+        //textBox_np->setFormat("[-]?[0-9]*\\.?[0-9]+");
         /*textBox_np->setCallback([](const std::string &text_value){
-            cout<<text_value<<"\n";
+            cout<<"sdsadasdasdad\n";
             return true;
         });*/
+
+        //If both textboxs are not focused, then update the object visualization
+        /*if(!textBox_np->focused() && !textBox_fp->focused()){
+            cout<<textBox_np<<"\n";
+            cout<<textBox_fp<<"\n";
+        }*/
 
         new Label(tools, "Far Plane", "sans-bold");
 
         textBox_fp = new MyTextBox(tools);
         textBox_fp->setFixedSize(Vector2i(200, 25));
-        textBox_fp->setValue("1000.0");
+        textBox_fp->setValue("3000.0");
         textBox_fp->setUnits("f");
         textBox_fp->setFontSize(16);
         textBox_fp->setFormat("[-]?[0-9]*\\.?[0-9]+");
@@ -562,11 +563,24 @@ public:
             }
         }
 
+        //Implementing delete of string with backspace (set with scancode because glfw 
+        //does not recognize GLFW_KEY_BACKSPACE)
+        if(key == -1 && scancode == 22){
+            while(action == GLFW_REPEAT || action == GLFW_PRESS){
+                text_textBox = text_textBox.substr(0, text_textBox.size()-1);
+
+                if(textBox_np->focused())
+                    textBox_np->setValue(text_textBox);
+                else if (textBox_fp->focused())
+                    textBox_fp->setValue(text_textBox);
+
+                return true;
+            }
+        }
 
         if (key >= 46 && key <= 57 && action == GLFW_PRESS){
-            cout<<textBox_np->isFocused<<"\n";
-            cout<<textBox_fp->isFocused<<"\n";
-            if(textBox_np->isFocused || textBox_fp->isFocused){
+
+            if(textBox_np->focused() || textBox_fp->focused()){
                 if (key == 48)
                     text_textBox += "0";
                 else if (key == 49)
@@ -590,7 +604,17 @@ public:
                 else if (key == 46)
                     text_textBox += ".";
 
-                cout<<text_textBox<<"\n";
+                if(textBox_np->focused())
+                    textBox_np->setValue(text_textBox);
+                else if (textBox_fp->focused())
+                    textBox_fp->setValue(text_textBox);
+
+                g_near_plane = std::stof(textBox_np->value());
+                g_far_plane = std::stof(textBox_fp->value());
+
+                cout<<g_near_plane<<"\n";
+                cout<<g_far_plane<<"\n";
+
             }
 
             return true;
