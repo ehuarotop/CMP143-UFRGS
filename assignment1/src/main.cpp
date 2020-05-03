@@ -160,6 +160,8 @@ public:
             this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
             this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
         }
+
+        firstMouse = true;
     }
 
     void setColor(glm::vec4 choosen_color){
@@ -268,12 +270,18 @@ public:
             glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-center_x, -center_y, -center_z));
             model = trans * model;
 
-            view = glm::lookAt(this->cameraPos,
+            if(firstMouse){
+                view = glm::lookAt(this->cameraPos,
+                           this->cameraFront,
+                           this->cameraUp);
+            } else {
+                view = glm::lookAt(this->cameraPos,
                            this->cameraFront,
                            this->cameraUp);
 
-            view = glm::rotate(view, pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-            view = glm::rotate(view, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+                view = glm::rotate(view, pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+                view = glm::rotate(view, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+            }
 
             projection = glm::perspective(glm::radians(fov),
                                             ((float)this->width())/this->height(),
