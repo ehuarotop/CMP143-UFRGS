@@ -76,6 +76,9 @@ float yaw   = -90.0f;   // yaw is initialized to -90.0 degrees since a yaw of 0.
 float pitch =  0.0f;
 float lastX =  500.0f / 2.0;
 float lastY =  500.0 / 2.0;
+float translateCamZ = 0.0f;
+float translateCamX = 0.0f;
+float translateCamY = 0.0f;
 float fov   =  45.0f;
 std::string text_textBox = "";
 
@@ -154,11 +157,17 @@ public:
             this->cameraPos = glm::vec3(0.0f, 0.0f, 5.0f);
             this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
             this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
+            translateCamZ = 5.0f;
+            translateCamX = 0.0f;
+            translateCamY = 0.0f;
         } else if (filename == "data/cow_up.in") {
             model_used = 2;
             this->cameraPos = glm::vec3(0.0f, 0.0f, g_max_total - g_min_total);
             this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
             this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
+            translateCamZ = g_max_total - g_min_total;
+            translateCamX = 0.0f;
+            translateCamY = 0.0f;
         }
 
         firstMouse = true;
@@ -274,11 +283,17 @@ public:
                 view = glm::lookAt(this->cameraPos,
                            this->cameraFront,
                            this->cameraUp);
+                view = glm::translate(view, glm::vec3(this->cameraPos.x - translateCamX, 
+                                                        this->cameraPos.y - translateCamY, 
+                                                        this->cameraPos.z-translateCamZ));
             } else {
                 view = glm::lookAt(this->cameraPos,
                            this->cameraFront,
                            this->cameraUp);
 
+                view = glm::translate(view, glm::vec3(this->cameraPos.x - translateCamX, 
+                                                        this->cameraPos.y - translateCamY, 
+                                                        this->cameraPos.z-translateCamZ));
                 view = glm::rotate(view, pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
                 view = glm::rotate(view, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
@@ -465,6 +480,7 @@ public:
     }
 
     virtual bool keyboardEvent(int key, int scancode, int action, int modifiers) {
+        //cout<<key<<","<<scancode<<"\n";
 
         if (Screen::keyboardEvent(key, scancode, action, modifiers))
             return true;
@@ -472,6 +488,80 @@ public:
             setVisible(false);
             return true;
         }
+
+        if (key == GLFW_KEY_W){
+            while(action == GLFW_REPEAT || action == GLFW_PRESS){
+                //cout<<"UP pressed \n";
+                if(this->mCanvasObject->model_used == 1)
+                    translateCamZ -= 1.0f;
+                else
+                    translateCamZ -= 15.0f;
+
+                return true;
+            }
+        }
+
+        if (key == GLFW_KEY_S){
+            while(action == GLFW_REPEAT || action == GLFW_PRESS){
+                //cout<<"DOWN pressed \n";
+                if(this->mCanvasObject->model_used == 1)
+                    translateCamZ += 1.0f;
+                else
+                    translateCamZ += 15.0f;
+
+                return true;
+            }
+        
+        }
+
+        if (key == GLFW_KEY_D){
+            while(action == GLFW_REPEAT || action == GLFW_PRESS){
+                //cout<<"UP pressed \n";
+                if(this->mCanvasObject->model_used == 1)
+                    translateCamX -= 1.0f;
+                else
+                    translateCamX -= 15.0f;
+
+                return true;
+            }
+        }
+
+        if (key == GLFW_KEY_A){
+            while(action == GLFW_REPEAT || action == GLFW_PRESS){
+                //cout<<"UP pressed \n";
+                if(this->mCanvasObject->model_used == 1)
+                    translateCamX += 1.0f;
+                else
+                    translateCamX += 15.0f;
+
+                return true;
+            }
+        }
+
+        if (key == GLFW_KEY_Q){
+            while(action == GLFW_REPEAT || action == GLFW_PRESS){
+                //cout<<"UP pressed \n";
+                if(this->mCanvasObject->model_used == 1)
+                    translateCamY -= 1.0f;
+                else
+                    translateCamY -= 15.0f;
+
+                return true;
+            }
+        }
+
+        if (key == GLFW_KEY_Z){
+            while(action == GLFW_REPEAT || action == GLFW_PRESS){
+                //cout<<"UP pressed \n";
+                if(this->mCanvasObject->model_used == 1)
+                    translateCamY += 1.0f;
+                else
+                    translateCamY += 15.0f;
+
+                return true;
+            }
+        }
+
 
         if (key >= 46 && key <= 57 && action == GLFW_PRESS){
             cout<<textBox_np->isFocused<<"\n";
