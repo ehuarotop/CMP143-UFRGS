@@ -56,10 +56,6 @@ using namespace std;
 using namespace nanogui;
 
 ///////////////////////// FUNCTION DECLARATION /////////////////////////
-//calback for resizing window
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-//callback for processing input
-//void processInput(GLFWwindow *window);
 //function to read files with extension .in (models)
 unsigned int readFile(const char* filename);
 
@@ -99,8 +95,10 @@ public:
     glm::vec3 cameraPos;
     glm::vec3 cameraFront;
     glm::vec3 cameraUp;
+    glm::vec3 cameraRight;
     float deltaTime = 0.0f; // time between current frame and last frame
     float lastFrame = 0.0f;
+    float distanceProjSphere = 0.0f;
 
     MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl"){
 
@@ -154,17 +152,21 @@ public:
 
         if (filename == "data/cube.in"){
             model_used = 1;
-            this->cameraPos = glm::vec3(0.0f, 0.0f, 5.0f);
-            this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
+            distanceProjSphere = 6.0f;
+            this->cameraPos = glm::vec3(0.0f, 0.0f, distanceProjSphere);
+            this->cameraFront = glm::vec3(0.0f,0.0f,-1.0f);
             this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
+            this->cameraRight = glm::vec3(1.0f,0.0f,0.0f);
             translateCamZ = 0.0f;
             translateCamX = 0.0f;
             translateCamY = 0.0f;
         } else if (filename == "data/cow_up.in") {
             model_used = 2;
-            this->cameraPos = glm::vec3(0.0f, 0.0f, g_max_total - g_min_total);
-            this->cameraFront = glm::vec3(0.0f,0.0f,0.0f);
+            distanceProjSphere = g_max_total - g_min_total;
+            this->cameraPos = glm::vec3(0.0f, 0.0f, distanceProjSphere);
+            this->cameraFront = glm::vec3(0.0f,0.0f,-1.0f);
             this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
+            this->cameraRight = glm::vec3(1.0f,0.0f,0.0f);
             translateCamZ = 0.0f;//g_max_total - g_min_total;
             translateCamX = 0.0f;
             translateCamY = 0.0f;
@@ -198,17 +200,15 @@ public:
             fov = 45.0f;
     }
 
-    virtual bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers){
+    /*virtual bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers){
         if (button == GLFW_MOUSE_BUTTON_3) {
             cout<<"Middle button was pressed\n";
             return true;
         }
         return false;
-    }
+    }*/
 
     virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
-        //cout<<"p->posx:"<<p.x()<<",posy:"<<p.y()<<"\n";
-
         //If the mouse is moved for the very first time
         if(firstMouse){
             lastX = p.x();
@@ -218,7 +218,6 @@ public:
 
         float xoffset = p.x() - lastX;
         float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
-        //float yoffset = p.y() - p.y();
         lastX = p.x();
         lastY = p.y();
 
@@ -238,11 +237,11 @@ public:
         /*glm::vec3 front;
         front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
         front.y = sin(glm::radians(pitch));
-        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));*/
 
-        this->cameraFront = glm::normalize(front);*/
+        //cameraFront = glm::normalize(front);
 
-        return false;
+        return true;
 
     }
 
@@ -274,75 +273,23 @@ public:
 
             if(firstMouse){
 
-                /*view = glm::lookAt(this->cameraPos,
-                           this->cameraFront,
-                           this->cameraUp);*/
+                if(model_used == 1)
+                    cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
+                else
+                    cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
 
-                /*glm::mat4 translate_t = glm::translate(glm::mat4(1.0f), glm::vec3(-translateCamX, 
-                                                        -translateCamY, 
-                                                        -translateCamZ));*/
-
-                glm::vec3 new_pos = glm::vec3(cameraPos.x - translateCamX, 
-                                                cameraPos.y - translateCamY,
-                                                cameraPos.z - translateCamZ);
-
-                new_pos = glm::normalize(new_pos)*(glm::length(cameraPos));
-
-                view = glm::lookAt(new_pos,
-                           this->cameraFront,
-                           this->cameraUp);
-
-                cameraPos = new_pos;
-                translateCamX = 0.0f;
-                translateCamY = 0.0f;
-                translateCamZ = 0.0f;
+                view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
                 
             } else {
 
-                cout<<cameraPos.x<<"\n";
-                cout<<cameraPos.y<<"\n";
-                cout<<cameraPos.z<<"\n";
+                if(model_used == 1)
+                    cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
+                else
+                    cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
 
-                /*glm::mat4 translate_t = glm::translate(glm::mat4(1.0f), glm::vec3(-translateCamX, 
-                                                        -translateCamY, 
-                                                        -translateCamZ));
-
-                glm::vec3 aux = glm::vec3(translate_t*glm::vec4(this->cameraPos, 1.0f));
-
-                view = glm::lookAt(glm::vec3(translate_t*glm::vec4(this->cameraPos, 1.0f)),
-                           this->cameraFront,
-                           this->cameraUp);*/
-
-                glm::vec3 new_pos = glm::vec3(cameraPos.x - translateCamX, 
-                                                cameraPos.y - translateCamY,
-                                                cameraPos.z - translateCamZ);
-
-                new_pos = glm::normalize(new_pos)*(glm::length(cameraPos));
-
-                view = glm::lookAt(new_pos,
-                           this->cameraFront,
-                           this->cameraUp);
-
-
-                cameraPos = new_pos;
-                translateCamX = 0.0f;
-                translateCamY = 0.0f;
-                translateCamZ = 0.0f;
+                view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
                 
-
-                cout<<new_pos.x<<"\n";
-                cout<<new_pos.y<<"\n";
-                cout<<new_pos.z<<"\n";
-
-                cout<<"-------------\n";
-
-                /*view = glm::lookAt(this->cameraPos,
-                           this->cameraFront,
-                           this->cameraUp);
-
-                view = glm::translate(view, glm::vec3(this->cameraPos.x - translateCamX, 
-                                                        this->cameraPos.y - translateCamY, 
-                                                        this->cameraPos.z-translateCamZ));*/
+                //Performing rotation
                 view = glm::rotate(view, pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
                 view = glm::rotate(view, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
@@ -537,7 +484,6 @@ public:
     }
 
     virtual bool keyboardEvent(int key, int scancode, int action, int modifiers) {
-        //cout<<key<<","<<scancode<<"\n";
 
         if (Screen::keyboardEvent(key, scancode, action, modifiers))
             return true;
@@ -546,13 +492,17 @@ public:
             return true;
         }
 
+        const float camera_speed = 1.0f;
+
         if (key == GLFW_KEY_W){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                //cout<<"UP pressed \n";
                 if(this->mCanvasObject->model_used == 1)
-                    translateCamZ -= 1.0f;
+                    this->mCanvasObject->cameraPos += 0.25f*camera_speed * this->mCanvasObject->cameraFront;
                 else
-                    translateCamZ -= 15.0f;
+                    this->mCanvasObject->cameraPos += 15.0f*camera_speed * this->mCanvasObject->cameraFront;
+
+                //Updating distance Projection Sphere
+                this->mCanvasObject->distanceProjSphere = glm::length(this->mCanvasObject->cameraPos);
 
                 return true;
             }
@@ -560,11 +510,13 @@ public:
 
         if (key == GLFW_KEY_S){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                //cout<<"DOWN pressed \n";
                 if(this->mCanvasObject->model_used == 1)
-                    translateCamZ += 1.0f;
+                    this->mCanvasObject->cameraPos -= 0.25f*camera_speed * this->mCanvasObject->cameraFront;
                 else
-                    translateCamZ += 15.0f;
+                    this->mCanvasObject->cameraPos -= 15.0f*camera_speed * this->mCanvasObject->cameraFront;
+
+                //Updating distance Projection Sphere
+                this->mCanvasObject->distanceProjSphere = glm::length(this->mCanvasObject->cameraPos);
 
                 return true;
             }
@@ -573,11 +525,18 @@ public:
 
         if (key == GLFW_KEY_D){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                //cout<<"UP pressed \n";
+
+                this->mCanvasObject->cameraRight = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
+                                                            this->mCanvasObject->cameraUp));
+
                 if(this->mCanvasObject->model_used == 1)
-                    translateCamX -= 1.0f;
+                    this->mCanvasObject->cameraPos +=  this->mCanvasObject->cameraRight * camera_speed;
                 else
-                    translateCamX -= 15.0f;
+                    this->mCanvasObject->cameraPos += this->mCanvasObject->cameraRight * 60.0f*camera_speed;
+
+                this->mCanvasObject->cameraFront = glm::normalize(-this->mCanvasObject->cameraPos);
+                /*this->mCanvasObject->cameraRight = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
+                                                            this->mCanvasObject->cameraUp));*/
 
                 return true;
             }
@@ -585,11 +544,18 @@ public:
 
         if (key == GLFW_KEY_A){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                //cout<<"UP pressed \n";
+
+                this->mCanvasObject->cameraRight = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
+                                                            this->mCanvasObject->cameraUp));
+
                 if(this->mCanvasObject->model_used == 1)
-                    translateCamX += 1.0f;
+                    this->mCanvasObject->cameraPos -= this->mCanvasObject->cameraRight * camera_speed;
                 else
-                    translateCamX += 15.0f;
+                    this->mCanvasObject->cameraPos -= this->mCanvasObject->cameraRight * 60.0f*camera_speed;
+
+                this->mCanvasObject->cameraFront = glm::normalize(-this->mCanvasObject->cameraPos);
+                /*this->mCanvasObject->cameraRight = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
+                                                            this->mCanvasObject->cameraUp));*/
 
                 return true;
             }
@@ -597,11 +563,17 @@ public:
 
         if (key == GLFW_KEY_Q){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                //cout<<"UP pressed \n";
+
+                this->mCanvasObject->cameraUp = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
+                                                            this->mCanvasObject->cameraRight));
+
                 if(this->mCanvasObject->model_used == 1)
-                    translateCamY -= 1.0f;
+                    this->mCanvasObject->cameraPos += this->mCanvasObject->cameraUp * camera_speed;
                 else
-                    translateCamY -= 15.0f;
+                    this->mCanvasObject->cameraPos += this->mCanvasObject->cameraUp * 60.0f*camera_speed;
+
+
+                this->mCanvasObject->cameraFront = glm::normalize(-this->mCanvasObject->cameraPos);
 
                 return true;
             }
@@ -609,11 +581,16 @@ public:
 
         if (key == GLFW_KEY_Z){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                //cout<<"UP pressed \n";
+
+                this->mCanvasObject->cameraUp = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
+                                                            this->mCanvasObject->cameraRight));
+
                 if(this->mCanvasObject->model_used == 1)
-                    translateCamY += 1.0f;
+                    this->mCanvasObject->cameraPos -= this->mCanvasObject->cameraUp * camera_speed;
                 else
-                    translateCamY += 15.0f;
+                    this->mCanvasObject->cameraPos -= this->mCanvasObject->cameraUp * 60.0f*camera_speed;
+
+                this->mCanvasObject->cameraFront = glm::normalize(-this->mCanvasObject->cameraPos);
 
                 return true;
             }
@@ -667,9 +644,6 @@ public:
 
                 g_near_plane = std::stof(textBox_np->value());
                 g_far_plane = std::stof(textBox_fp->value());
-
-                cout<<g_near_plane<<"\n";
-                cout<<g_far_plane<<"\n";
 
             }
 
