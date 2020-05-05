@@ -222,22 +222,11 @@ public:
         if (pitch < -89.0f)
             pitch = -89.0f;
 
-        /*glm::vec3 front;
-        front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-        front.y = sin(glm::radians(pitch));
-        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));*/
-
-        //cameraFront = glm::normalize(front);
-
         return true;
 
     }
 
     virtual void drawGL() override {
-
-        float currentFrame = glfwGetTime();
-        this->deltaTime = currentFrame - this->lastFrame;
-        this->lastFrame = currentFrame;
 
         if (model_used == 0){
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -259,21 +248,14 @@ public:
             glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-center_x, -center_y, -center_z));
             model = trans * model;
 
-            if(firstMouse){
+            //Normalizing and scaling cameraPos by distanceProjSphere
+            cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
 
-                if(model_used == 1)
-                    cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
-                else
-                    cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
+            if(firstMouse){
 
                 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
                 
             } else {
-
-                if(model_used == 1)
-                    cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
-                else
-                    cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
 
                 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
                 
@@ -302,11 +284,11 @@ public:
 
             if(culling_orientation == 1){
                 glEnable(GL_CULL_FACE);
-                glCullFace(GL_FRONT);
+                glCullFace(GL_BACK);
                 glFrontFace(GL_CW); 
             }else if (culling_orientation == 2){
                 glEnable(GL_CULL_FACE);
-                glCullFace(GL_FRONT);
+                glCullFace(GL_BACK);
                 glFrontFace(GL_CCW);
             }
 
