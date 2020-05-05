@@ -100,7 +100,7 @@ public:
     float lastFrame = 0.0f;
     float distanceProjSphere = 0.0f;
 
-    MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("src/shader_vertex.glsl", "src/shader_fragment.glsl"){
+    MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex.glsl", "../src/shader_fragment.glsl"){
 
         //Setting initial color to white
         this->color = glm::vec4(1.0f);
@@ -110,7 +110,7 @@ public:
 
         //Reading file with the information corresponding to the cube
         custom_shader.use();
-        if (model_filename != "data/cube.in" && model_filename != "data/cow_up.in")
+        if (model_filename != "../data/cube.in" && model_filename != "../data/cow_up.in")
             model_used = 0;
 
     }
@@ -150,7 +150,7 @@ public:
             }
         }
 
-        if (filename == "data/cube.in"){
+        if (filename == "../data/cube.in"){
             model_used = 1;
             distanceProjSphere = 6.0f;
             this->cameraPos = glm::vec3(0.0f, 0.0f, distanceProjSphere);
@@ -160,7 +160,7 @@ public:
             translateCamZ = 0.0f;
             translateCamX = 0.0f;
             translateCamY = 0.0f;
-        } else if (filename == "data/cow_up.in") {
+        } else if (filename == "../data/cow_up.in") {
             model_used = 2;
             distanceProjSphere = g_max_total - g_min_total;
             this->cameraPos = glm::vec3(0.0f, 0.0f, distanceProjSphere);
@@ -187,10 +187,6 @@ public:
         this->culling_orientation = culling_orientation;
     }
 
-    /*~MyGLCanvas() {
-        mShader.free();
-    }*/
-
     virtual bool scrollEvent(const Vector2i &p, const Vector2f &rel){
         if (fov >= 1.0f && fov <= 45.0f)
             fov -= rel.y();
@@ -199,14 +195,6 @@ public:
         if (fov >= 45.0f)
             fov = 45.0f;
     }
-
-    /*virtual bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers){
-        if (button == GLFW_MOUSE_BUTTON_3) {
-            cout<<"Middle button was pressed\n";
-            return true;
-        }
-        return false;
-    }*/
 
     virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
         //If the mouse is moved for the very first time
@@ -411,12 +399,12 @@ public:
 
         Button *load_cube = new Button(tools, "Load cube object");
         load_cube->setCallback([this](){
-            mCanvasObject->setModel("data/cube.in");
+            mCanvasObject->setModel("../data/cube.in");
         });
 
         Button *load_cow = new Button(tools, "Load Cow object");
         load_cow->setCallback([this](){
-            mCanvasObject->setModel("data/cow_up.in");
+            mCanvasObject->setModel("../data/cow_up.in");
         });
 
         new Label(tools, "Choose a color", "sans-bold");
@@ -434,17 +422,6 @@ public:
         textBox_np->setValue("1.0");
         textBox_np->setUnits("f");
         textBox_np->setFontSize(16);
-        //textBox_np->setFormat("[-]?[0-9]*\\.?[0-9]+");
-        /*textBox_np->setCallback([](const std::string &text_value){
-            cout<<"sdsadasdasdad\n";
-            return true;
-        });*/
-
-        //If both textboxs are not focused, then update the object visualization
-        /*if(!textBox_np->focused() && !textBox_fp->focused()){
-            cout<<textBox_np<<"\n";
-            cout<<textBox_fp<<"\n";
-        }*/
 
         new Label(tools, "Far Plane", "sans-bold");
 
@@ -847,18 +824,6 @@ unsigned int readFile(const char* filename){
 
     //Unbinding the VBO buffer
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    /////////////  Binding buffer for vertex VBO_color //////////////////////
-    /*glGenBuffers(1, &VBO_color);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_color);
-    //Putting buffer data
-    glBufferData(GL_ARRAY_BUFFER, num_triangles*3*sizeof(GL_FLOAT), color_triangle, GL_STATIC_DRAW);
-    //Position, # dimensions, data type, ##, 0, 0
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    //Setting 0 in position (according to the specification on the shader)
-    glEnableVertexAttribArray(1);
-    //Unbinding the VBO buffer
-    glBindBuffer(GL_ARRAY_BUFFER, 0);*/
 
     //Unbinding VAO
     glBindVertexArray(0);

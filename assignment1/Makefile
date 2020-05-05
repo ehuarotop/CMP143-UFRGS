@@ -1,10 +1,10 @@
-.bin/triangles: src/triangles.cpp src/glad.c
+.bin/triangles: src/main.cpp src/glad.c
 	mkdir -p bin
-	g++ -I ./include/ -o ./bin/triangles src/glad.c src/triangles.cpp -lglfw3 -lX11 -lpthread -lXrandr -lXi -ldl
+	g++ -g -std=c++1z -I include/ -o ./bin/assignment1 src/glad.c src/main.cpp -lglfw3 -lX11 -lpthread -lXrandr -lXi -lGL -ldl -L/usr/local/lib -lnanogui
 
 .PHONY: clean run
 clean:
 	rm -rf bin/
 
-run: ./bin/triangles
-	cd bin/ && ./triangles
+run: ./bin/assignment1
+	cd bin/ && ./assignment1
