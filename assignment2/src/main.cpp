@@ -46,6 +46,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <shader_s.h>
+#include <camera.h>
 
 #include <iostream>
 #include <fstream>
@@ -67,11 +68,13 @@ const int MAX_MATERIAL_COUNT = 1; //Defining constant for max number of material
 int g_num_triangles = 0;
 
 ////////NANOGUI///////////
+unsigned int WINDOW_WIDTH = 450;
+unsigned int WINDOW_HEIGHT = 450;
 bool firstMouse = true;
 float yaw   = -90.0f;   // yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right so we initially rotate a bit to the left.
 float pitch =  0.0f;
-float lastX =  500.0f / 2.0;
-float lastY =  500.0 / 2.0;
+float lastX =  (float)(WINDOW_WIDTH) / 2.0;
+float lastY =  (float)(WINDOW_HEIGHT) / 2.0;
 float translateCamZ = 0.0f;
 float translateCamX = 0.0f;
 float translateCamY = 0.0f;
@@ -92,10 +95,7 @@ class MyGLCanvas : public GLCanvas{
 public:
     //what model is being rendered at the moment (0:none, 1:cube, 2:cow)
     int model_used;
-    glm::vec3 cameraPos;
-    glm::vec3 cameraFront;
-    glm::vec3 cameraUp;
-    glm::vec3 cameraRight;
+    Camera camera = Camera();
     float deltaTime = 0.0f; // time between current frame and last frame
     float lastFrame = 0.0f;
     float distanceProjSphere = 0.0f;
@@ -152,25 +152,13 @@ public:
 
         if (filename == "../data/cube.in"){
             model_used = 1;
-            distanceProjSphere = 6.0f;
-            this->cameraPos = glm::vec3(0.0f, 0.0f, distanceProjSphere);
-            this->cameraFront = glm::vec3(0.0f,0.0f,-1.0f);
-            this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
-            this->cameraRight = glm::vec3(1.0f,0.0f,0.0f);
-            translateCamZ = 0.0f;
-            translateCamX = 0.0f;
-            translateCamY = 0.0f;
+            camera.setDistanceProjSphere(6.0f);
         } else if (filename == "../data/cow_up.in") {
             model_used = 2;
-            distanceProjSphere = g_max_total - g_min_total;
-            this->cameraPos = glm::vec3(0.0f, 0.0f, distanceProjSphere);
-            this->cameraFront = glm::vec3(0.0f,0.0f,-1.0f);
-            this->cameraUp = glm::vec3(0.0f,1.0f,0.0f);
-            this->cameraRight = glm::vec3(1.0f,0.0f,0.0f);
-            translateCamZ = 0.0f;//g_max_total - g_min_total;
-            translateCamX = 0.0f;
-            translateCamY = 0.0f;
+            camera.setDistanceProjSphere(g_max_total - g_min_total);
         }
+
+        camera.setModel(model_used);
 
         firstMouse = true;
     }
@@ -185,45 +173,6 @@ public:
 
     void setCullingOrientation(unsigned int culling_orientation){
         this->culling_orientation = culling_orientation;
-    }
-
-    virtual bool scrollEvent(const Vector2i &p, const Vector2f &rel){
-        if (fov >= 1.0f && fov <= 45.0f)
-            fov -= rel.y();
-        if (fov <= 1.0f)
-            fov = 1.0f;
-        if (fov >= 45.0f)
-            fov = 45.0f;
-    }
-
-    virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
-        //If the mouse is moved for the very first time
-        if(firstMouse){
-            lastX = p.x();
-            lastY = p.y();
-            firstMouse = false;
-        }
-
-        float xoffset = p.x() - lastX;
-        float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
-        lastX = p.x();
-        lastY = p.y();
-
-        float sensitivity = 0.01f; // change this value to your liking
-        xoffset *= sensitivity;
-        yoffset *= sensitivity;
-
-        yaw += xoffset;
-        pitch += yoffset;
-
-        // make sure that when pitch is out of bounds, screen doesn't get flipped
-        if (pitch > 89.0f)
-            pitch = 89.0f;
-        if (pitch < -89.0f)
-            pitch = -89.0f;
-
-        return true;
-
     }
 
     virtual void drawGL() override {
@@ -249,22 +198,24 @@ public:
             model = trans * model;
 
             //Normalizing and scaling cameraPos by distanceProjSphere
-            cameraPos = glm::normalize(cameraPos)*(distanceProjSphere);
+            camera.cameraPos = glm::normalize(camera.cameraPos)*(camera.distanceProjSphere);
 
             if(firstMouse){
 
-                view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+                //view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+                view = camera.getLookAtMatrix();
                 
             } else {
 
-                view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+                //view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+                view = camera.getLookAtMatrix();
                 
                 //Performing rotation
-                view = glm::rotate(view, pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-                view = glm::rotate(view, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+                view = glm::rotate(view, camera.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+                view = glm::rotate(view, camera.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
 
-            projection = glm::perspective(glm::radians(fov),
+            projection = glm::perspective(glm::radians(camera.fov),
                                             ((float)this->width())/this->height(),
                                             g_near_plane, g_far_plane);
 
@@ -320,8 +271,6 @@ private:
 class MyTextBox : public nanogui::TextBox{
 public:
 
-    //bool isFocused = false;
-
     MyTextBox(Widget *parent) : nanogui::TextBox(parent){
 
     }
@@ -329,10 +278,8 @@ public:
     virtual bool focusEvent(bool focused){
         if (focused){
             this->setValue("");
-            //isFocused = true;
             this->setFocused(true);
         }else{
-            //isFocused = false;
             this->setFocused(false);
             text_textBox = "";
         }
@@ -346,11 +293,12 @@ class App : public nanogui::Screen {
 public:
 
     Window *window;
+    Window *windowC2GL;
     Window *windowGUI;
     MyTextBox *textBox_np;
     MyTextBox *textBox_fp;
 
-    App() : nanogui::Screen(Eigen::Vector2i(800, 650), "Programming Assignment 1", false) {
+    App() : nanogui::Screen(Eigen::Vector2i(1250, 650), "Programming Assignment 1", false) {
         using namespace nanogui;
 
         // Printing to terminal opengl and glsl version
@@ -360,17 +308,29 @@ public:
         const GLubyte *glslversion = glGetString(GL_SHADING_LANGUAGE_VERSION);
         printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
 
-        //Creating window for render the object and perform operations
-        window = new Window(this, "Rendering Polygonal Meshes with OpenGL and GLSL shaders");
+        //Creating window for render object with OpenGL
+        window = new Window(this, "OpenGL Implementation");
         window->setPosition(Vector2i(15, 15));
         window->setLayout(new GroupLayout());
 
         mCanvasObject = new MyGLCanvas(window);
         mCanvasObject->setBackgroundColor({100, 100, 100, 255});
-        mCanvasObject->setSize({500, 500});
+        mCanvasObject->setSize({WINDOW_WIDTH, WINDOW_HEIGHT});
 
+
+        //Creating window for render object with Close2GL
+        windowC2GL = new Window(this, "Close2GL Implementation");
+        windowC2GL->setPosition(Vector2i(515, 15));
+        windowC2GL->setLayout(new GroupLayout());
+
+        mCanvasObjectC2GL = new MyGLCanvas(windowC2GL);
+        mCanvasObjectC2GL->setBackgroundColor({100, 100, 100, 255});
+        mCanvasObjectC2GL->setSize({WINDOW_WIDTH, WINDOW_HEIGHT});
+
+
+        //Creating window for GUI options
         windowGUI = new Window(this, "Options");
-        windowGUI->setPosition(Vector2i(570,15));
+        windowGUI->setPosition(Vector2i(1010,15));
         windowGUI->setLayout(new GroupLayout());
 
         Widget *tools = new Widget(windowGUI);
@@ -382,19 +342,25 @@ public:
         Button *load_cube = new Button(tools, "Load cube object");
         load_cube->setCallback([this](){
             mCanvasObject->setModel("../data/cube.in");
+            mCanvasObjectC2GL->setModel("../data/cube.in");
         });
 
         Button *load_cow = new Button(tools, "Load Cow object");
         load_cow->setCallback([this](){
             mCanvasObject->setModel("../data/cow_up.in");
+            mCanvasObjectC2GL->setModel("../data/cow_up.in");
         });
 
         new Label(tools, "Choose a color", "sans-bold");
 
         ColorWheel *colorwheel = new ColorWheel(tools);
         colorwheel->setCallback([this](const Color &c){
+            //Getting chosen color
             glm::vec4 choosen_color = glm::vec4(c.r(), c.g(), c.b(), c.w());
+
+            //Setting color in canvas objects.
             mCanvasObject->setColor(choosen_color);
+            mCanvasObjectC2GL->setColor(choosen_color);
         });
 
         new Label(tools, "Near Plane", "sans-bold");
@@ -417,29 +383,90 @@ public:
         new Label(tools, "Drawing mode", "sans-bold");
         Button *draw_points = new Button(tools, "Points");
         draw_points->setCallback([this](){
+            //Setting drawing mode to points
             mCanvasObject->setDrawingMode(1);
+            mCanvasObjectC2GL->setDrawingMode(1);
         });
         Button *draw_wireframe = new Button(tools, "Wireframes");
         draw_wireframe->setCallback([this](){
+            //Setting drawing mode to wireframes
             mCanvasObject->setDrawingMode(2);
+            mCanvasObjectC2GL->setDrawingMode(2);
         });
         Button *draw_polygon = new Button(tools, "Solid Polygons");
         draw_polygon->setCallback([this](){
+            //Setting drawing mode to polygon
             mCanvasObject->setDrawingMode(3);
+            mCanvasObjectC2GL->setDrawingMode(3);
         });
 
 
         new Label(tools, "Culling Orientation", "sans-bold");
         Button *clockwise = new Button(tools, "Clockwise");
         clockwise->setCallback([this](){
+            //Setting culling orientation
             mCanvasObject->setCullingOrientation(1);
+            mCanvasObjectC2GL->setCullingOrientation(1);
         });
         Button *counter_clockwise = new Button(tools, "Counter Clockwise");
         counter_clockwise->setCallback([this](){
+            //Setting culling orientation
             mCanvasObject->setCullingOrientation(2);
+            mCanvasObjectC2GL->setCullingOrientation(2);
         });
 
         performLayout();
+    }
+
+    virtual bool scrollEvent(const Vector2i &p, const Vector2f &rel){
+        if (fov >= 1.0f && fov <= 45.0f)
+            fov -= rel.y();
+        if (fov <= 1.0f)
+            fov = 1.0f;
+        if (fov >= 45.0f)
+            fov = 45.0f;
+
+        mCanvasObject->camera.fov = fov;
+        mCanvasObjectC2GL->camera.fov = fov;
+    }
+
+    virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
+        if((p.x() >= 15.0f && p.x() <= 15.0f + WINDOW_WIDTH) || 
+            (p.x() >= 515.0f && p.x() <= 515.0f + WINDOW_WIDTH)){
+            //If the mouse is moved for the very first time
+            if(firstMouse){
+                lastX = p.x();
+                lastY = p.y();
+                firstMouse = false;
+            }
+
+            float xoffset = p.x() - lastX;
+            float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
+            lastX = p.x();
+            lastY = p.y();
+
+            float sensitivity = 0.01f; // change this value to your liking
+            xoffset *= sensitivity;
+            yoffset *= sensitivity;
+
+            yaw += xoffset;
+            pitch += yoffset;
+
+            // make sure that when pitch is out of bounds, screen doesn't get flipped
+            if (pitch > 89.0f)
+                pitch = 89.0f;
+            if (pitch < -89.0f)
+                pitch = -89.0f;
+
+            mCanvasObject->camera.yaw = yaw;
+            mCanvasObject->camera.pitch = pitch;
+
+            mCanvasObjectC2GL->camera.yaw = yaw;
+            mCanvasObjectC2GL->camera.pitch = pitch;
+        }
+
+        return true;
+
     }
 
     virtual bool keyboardEvent(int key, int scancode, int action, int modifiers) {
@@ -453,49 +480,35 @@ public:
 
         const float camera_speed = 1.0f;
 
+        //Translation along the z axis (towards negative z axis, close up effect)
         if (key == GLFW_KEY_W){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                if(this->mCanvasObject->model_used == 1)
-                    this->mCanvasObject->cameraPos += 0.25f*camera_speed * this->mCanvasObject->cameraFront;
-                else
-                    this->mCanvasObject->cameraPos += 15.0f*camera_speed * this->mCanvasObject->cameraFront;
 
-                //Updating distance Projection Sphere
-                this->mCanvasObject->distanceProjSphere = glm::length(this->mCanvasObject->cameraPos);
+                mCanvasObject->camera.processRotation(FORWARD);
+                mCanvasObjectC2GL->camera.processRotation(FORWARD);
 
                 return true;
             }
         }
 
+        //Translation along the z axis (towards positive z axis, zoom out effect)
         if (key == GLFW_KEY_S){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                if(this->mCanvasObject->model_used == 1)
-                    this->mCanvasObject->cameraPos -= 0.25f*camera_speed * this->mCanvasObject->cameraFront;
-                else
-                    this->mCanvasObject->cameraPos -= 15.0f*camera_speed * this->mCanvasObject->cameraFront;
 
-                //Updating distance Projection Sphere
-                this->mCanvasObject->distanceProjSphere = glm::length(this->mCanvasObject->cameraPos);
+                mCanvasObject->camera.processRotation(BACKWARD);
+                mCanvasObjectC2GL->camera.processRotation(BACKWARD);
 
                 return true;
             }
         
         }
 
+        //Translation along the X axis (towards positive x axis)
         if (key == GLFW_KEY_D){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
-                this->mCanvasObject->cameraRight = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
-                                                            this->mCanvasObject->cameraUp));
-
-                if(this->mCanvasObject->model_used == 1)
-                    this->mCanvasObject->cameraPos +=  this->mCanvasObject->cameraRight * camera_speed;
-                else
-                    this->mCanvasObject->cameraPos += this->mCanvasObject->cameraRight * 60.0f*camera_speed;
-
-                this->mCanvasObject->cameraFront = glm::normalize(-this->mCanvasObject->cameraPos);
-                /*this->mCanvasObject->cameraRight = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
-                                                            this->mCanvasObject->cameraUp));*/
+                mCanvasObject->camera.processRotation(RIGHT);
+                mCanvasObjectC2GL->camera.processRotation(RIGHT);
 
                 return true;
             }
@@ -504,17 +517,8 @@ public:
         if (key == GLFW_KEY_A){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
-                this->mCanvasObject->cameraRight = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
-                                                            this->mCanvasObject->cameraUp));
-
-                if(this->mCanvasObject->model_used == 1)
-                    this->mCanvasObject->cameraPos -= this->mCanvasObject->cameraRight * camera_speed;
-                else
-                    this->mCanvasObject->cameraPos -= this->mCanvasObject->cameraRight * 60.0f*camera_speed;
-
-                this->mCanvasObject->cameraFront = glm::normalize(-this->mCanvasObject->cameraPos);
-                /*this->mCanvasObject->cameraRight = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
-                                                            this->mCanvasObject->cameraUp));*/
+                mCanvasObject->camera.processRotation(LEFT);
+                mCanvasObjectC2GL->camera.processRotation(LEFT);
 
                 return true;
             }
@@ -523,16 +527,8 @@ public:
         if (key == GLFW_KEY_Q){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
-                this->mCanvasObject->cameraUp = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
-                                                            this->mCanvasObject->cameraRight));
-
-                if(this->mCanvasObject->model_used == 1)
-                    this->mCanvasObject->cameraPos += this->mCanvasObject->cameraUp * camera_speed;
-                else
-                    this->mCanvasObject->cameraPos += this->mCanvasObject->cameraUp * 60.0f*camera_speed;
-
-
-                this->mCanvasObject->cameraFront = glm::normalize(-this->mCanvasObject->cameraPos);
+                mCanvasObject->camera.processRotation(UP);
+                mCanvasObjectC2GL->camera.processRotation(UP);
 
                 return true;
             }
@@ -541,15 +537,8 @@ public:
         if (key == GLFW_KEY_Z){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
-                this->mCanvasObject->cameraUp = glm::normalize(-glm::cross(this->mCanvasObject->cameraFront, 
-                                                            this->mCanvasObject->cameraRight));
-
-                if(this->mCanvasObject->model_used == 1)
-                    this->mCanvasObject->cameraPos -= this->mCanvasObject->cameraUp * camera_speed;
-                else
-                    this->mCanvasObject->cameraPos -= this->mCanvasObject->cameraUp * 60.0f*camera_speed;
-
-                this->mCanvasObject->cameraFront = glm::normalize(-this->mCanvasObject->cameraPos);
+                mCanvasObject->camera.processRotation(DOWN);
+                mCanvasObjectC2GL->camera.processRotation(DOWN);
 
                 return true;
             }
@@ -619,6 +608,7 @@ public:
 
 private:
     MyGLCanvas *mCanvasObject;
+    MyGLCanvas *mCanvasObjectC2GL;
     MyGLCanvas *mCanvasGUI;
 };
 
