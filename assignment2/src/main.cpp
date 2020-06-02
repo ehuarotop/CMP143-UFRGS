@@ -44,9 +44,12 @@
 #include <glm/mat4x4.hpp> // glm::mat4
 #include <glm/gtc/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale, glm::perspective
 #include <glm/gtc/type_ptr.hpp>
+//to print vectors and matrices
+#include <glm/gtx/string_cast.hpp>
 
 #include <shader_s.h>
 #include <camera.h>
+#include <close2gl.h>
 
 #include <iostream>
 #include <fstream>
@@ -90,7 +93,7 @@ struct Triangle {
     float Color[3];
 };
 
-//Defining a canvas class where objects will be rendered
+///////////////////////////////// CANVAS DECLARATION OPENGL /////////////////////////////////
 class MyGLCanvas : public GLCanvas{
 public:
     //what model is being rendered at the moment (0:none, 1:cube, 2:cow)
@@ -201,13 +204,9 @@ public:
             camera.cameraPos = glm::normalize(camera.cameraPos)*(camera.distanceProjSphere);
 
             if(firstMouse){
-
-                //view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
                 view = camera.getLookAtMatrix();
                 
             } else {
-
-                //view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
                 view = camera.getLookAtMatrix();
                 
                 //Performing rotation
@@ -256,6 +255,182 @@ public:
                 glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
             
             glDisable(GL_DEPTH_TEST);
+        }
+    }
+
+private:
+    unsigned int VAO;
+    CustomShader custom_shader;
+    const char* model_filename;
+    glm::vec4 color;
+    unsigned int drawing_mode;
+    unsigned int culling_orientation;
+};
+
+
+///////////////////////////////// CANVAS DECLARATION CLOSE2GL /////////////////////////////////
+class MyGLCanvasC2GL : public GLCanvas{
+public:
+    //what model is being rendered at the moment (0:none, 1:cube, 2:cow)
+    int model_used;
+    Camera camera = Camera();
+    Close2GL close2gl = Close2GL();
+    float deltaTime = 0.0f; // time between current frame and last frame
+    float lastFrame = 0.0f;
+    float distanceProjSphere = 0.0f;
+
+    MyGLCanvasC2GL(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex.glsl", "../src/shader_fragment.glsl"){
+
+        //Setting initial color to white
+        this->color = glm::vec4(1.0f);
+
+        //Setting initial drawing mode to 3 -> solid polygons
+        this->drawing_mode = 3;
+
+        //Reading file with the information corresponding to the cube
+        custom_shader.use();
+        if (model_filename != "../data/cube.in" && model_filename != "../data/cow_up.in")
+            model_used = 0;
+
+    }
+
+    void setModel(const char* filename){
+        this->model_filename = filename;
+        VAO = readFile(model_filename);
+
+        //Getting min and max total
+        ////// MIN /////
+        if(g_min_X < g_min_Y){
+            if(g_min_X < g_min_Z){
+                g_min_total = g_min_X;
+            }else{
+                g_min_total = g_min_Z;
+            }
+        }else{
+            if(g_min_Y < g_min_Z){
+                g_min_total = g_min_Y;
+            }else{
+                g_min_total = g_min_Z;
+            }
+        }
+
+        ///// MAX /////
+        if (g_max_X > g_max_Y){
+            if(g_max_X > g_max_Z){
+                g_max_total = g_max_X;
+            }else{
+                g_max_total = g_max_Z;
+            }
+        }else{
+            if(g_max_Y > g_max_Z){
+                g_max_total = g_max_Y;
+            }else{
+                g_max_total = g_max_Z;
+            }
+        }
+
+        if (filename == "../data/cube.in"){
+            model_used = 1;
+            camera.setDistanceProjSphere(6.0f);
+        } else if (filename == "../data/cow_up.in") {
+            model_used = 2;
+            camera.setDistanceProjSphere(g_max_total - g_min_total);
+        }
+
+        camera.setModel(model_used);
+
+        firstMouse = true;
+    }
+
+    void setColor(glm::vec4 choosen_color){
+        this->color = choosen_color;
+    }
+
+    void setDrawingMode(unsigned int drawing_mode){
+        this->drawing_mode = drawing_mode;
+    }
+
+    void setCullingOrientation(unsigned int culling_orientation){
+        this->culling_orientation = culling_orientation;
+    }
+
+    virtual void drawGL() override {
+
+        if (model_used == 0){
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }else{
+            //Loading the shader program
+            custom_shader.use();
+
+            //create transformations
+            //glm::mat4 modelView     = close2gl.setModelViewMatrix();
+            //glm::mat4 projection    = close2gl.setProjectionMatrix();
+
+
+            float center_x = (g_min_X+g_max_X)/2.0f;
+            float center_y = (g_min_Y+g_max_Y)/2.0f;
+            float center_z = (g_min_Z+g_max_Z)/2.0f;
+
+            //Translating the model to the origin (0,0,0)
+            /*glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-center_x, -center_y, -center_z));
+            model = trans * model;
+
+            //Normalizing and scaling cameraPos by distanceProjSphere
+            camera.cameraPos = glm::normalize(camera.cameraPos)*(camera.distanceProjSphere);
+
+            if(firstMouse){
+                view = camera.getLookAtMatrix();
+                
+            } else {
+                view = camera.getLookAtMatrix();
+                
+                //Performing rotation
+                view = glm::rotate(view, camera.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+                view = glm::rotate(view, camera.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+            }
+
+            projection = glm::perspective(glm::radians(camera.fov),
+                                            ((float)this->width())/this->height(),
+                                            g_near_plane, g_far_plane);
+
+            // retrieve the matrix uniform locations
+            unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
+            unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
+            unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
+            unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
+
+            // pass them to the shaders (3 different ways)
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+            glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
+
+            glBindVertexArray(VAO);
+
+            if(culling_orientation == 1){
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                glFrontFace(GL_CW); 
+            }else if (culling_orientation == 2){
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                glFrontFace(GL_CCW);
+            }
+
+            glEnable(GL_DEPTH_TEST);
+
+            if(drawing_mode == 1)
+                glDrawArrays(GL_POINTS, 0, g_num_triangles*3);
+            else if (drawing_mode == 2){
+                glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+                glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
+                glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+            }
+            else if (drawing_mode == 3)
+                glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
+            
+            glDisable(GL_DEPTH_TEST);*/
         }
     }
 
@@ -323,10 +498,9 @@ public:
         windowC2GL->setPosition(Vector2i(515, 15));
         windowC2GL->setLayout(new GroupLayout());
 
-        mCanvasObjectC2GL = new MyGLCanvas(windowC2GL);
+        mCanvasObjectC2GL = new MyGLCanvasC2GL(windowC2GL);
         mCanvasObjectC2GL->setBackgroundColor({100, 100, 100, 255});
         mCanvasObjectC2GL->setSize({WINDOW_WIDTH, WINDOW_HEIGHT});
-
 
         //Creating window for GUI options
         windowGUI = new Window(this, "Options");
@@ -608,7 +782,7 @@ public:
 
 private:
     MyGLCanvas *mCanvasObject;
-    MyGLCanvas *mCanvasObjectC2GL;
+    MyGLCanvasC2GL *mCanvasObjectC2GL;
     MyGLCanvas *mCanvasGUI;
 };
 
