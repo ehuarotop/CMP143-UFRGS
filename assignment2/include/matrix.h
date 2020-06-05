@@ -7,6 +7,8 @@
 
 using namespace std;
 
+#define PI 3.14159265
+
 class Matrix{
 public:
 
@@ -42,12 +44,30 @@ public:
 
 	glm::mat4 translate(glm::vec3 vector){
 		glm::mat4 translation = glm::mat4(1.0f);
-		translation[0][3] = vector.x;
-		translation[1][3] = vector.y;
-		translation[2][3] = vector.z;
+		translation[3][0] = vector.x;
+		translation[3][1] = vector.y;
+		translation[3][2] = vector.z;
 
 		return translation;
 
+	}
+
+	glm::mat4 rotate(glm::mat4 matrix, float angle, glm::vec3 axis){
+
+		float sina = sin(angle * PI/180.0f);
+		float cosa = cos(angle * PI/180.0f);
+
+		matrix[0][0] = cosa + (1-cosa)*axis.x;					matrix[1][0] = (1-cosa)*axis.x*axis.y + sina*axis.z;	matrix[2][0] = (1-cosa)*axis.x*axis.z - sina*axis.y;	matrix[3][0] = 0;
+		matrix[0][1] = (1-cosa)*axis.y*axis.x - sina*axis.z;	matrix[1][1] = cosa + (1-cosa)*pow(axis.y, 2);			matrix[2][1] = (1-cosa)*axis.y*axis.z - sina*axis.x;	matrix[3][1] = 0;
+		matrix[0][2] = (1-cosa)*axis.z*axis.x + sina*axis.y;	matrix[1][2] = (1-cosa)*axis.z*axis.z - sina*axis.x;	matrix[2][2] = cosa + (1-cosa)*pow(axis.z, 2);			matrix[3][2] = 0;
+		matrix[0][3] = 0.0f;									matrix[1][3] = 0.0f;									matrix[2][3] = 0.0f;									matrix[3][3] = 1.0f;
+
+		/*matrix[0][0] = cosa + (1-cosa)*axis.x;					matrix[1][0] = (1-cosa)*axis.x*axis.y + sina*axis.z;	matrix[2][0] = (1-cosa)*axis.x*axis.z - sina*axis.y;	matrix[3][0] = 0;
+		matrix[0][1] = (1-cosa)*axis.y*axis.x - sina*axis.z;	matrix[1][1] = cosa + (1-cosa)*pow(axis.y, 2);			matrix[2][1] = (1-cosa)*axis.y*axis.z - sina*axis.x;	matrix[3][1] = 0;
+		matrix[0][2] = (1-cosa)*axis.z*axis.x + sina*axis.y;	matrix[1][2] = (1-cosa)*axis.z*axis.z - sina*axis.x;	matrix[2][2] = cosa + (1-cosa)*pow(axis.z, 2);			matrix[3][2] = 0;
+		matrix[0][3] = 0.0f;									matrix[1][3] = 0.0f;									matrix[2][3] = 0.0f;									matrix[3][3] = 1.0f;*/
+
+		return matrix;
 	}
 
 	float dotProduct(glm::vec3 vec1, glm::vec3 vec2){

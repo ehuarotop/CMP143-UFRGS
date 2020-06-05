@@ -50,6 +50,7 @@
 #include <shader_s.h>
 #include <camera.h>
 #include <close2gl.h>
+#include <matrix.h>
 
 #include <iostream>
 #include <fstream>
@@ -205,7 +206,6 @@ public:
 
             if(firstMouse){
                 view = camera.getLookAtMatrix();
-                
             } else {
                 view = camera.getLookAtMatrix();
                 
@@ -273,13 +273,14 @@ class MyGLCanvasC2GL : public GLCanvas{
 public:
     //what model is being rendered at the moment (0:none, 1:cube, 2:cow)
     int model_used;
-    Camera camera = Camera();
+    //Camera camera = Camera();
     Close2GL close2gl = Close2GL();
+    Matrix matrix = Matrix();
     float deltaTime = 0.0f; // time between current frame and last frame
     float lastFrame = 0.0f;
     float distanceProjSphere = 0.0f;
 
-    MyGLCanvasC2GL(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex.glsl", "../src/shader_fragment.glsl"){
+    MyGLCanvasC2GL(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex_c2gl.glsl", "../src/shader_fragment_c2gl.glsl"){
 
         //Setting initial color to white
         this->color = glm::vec4(1.0f);
@@ -331,13 +332,16 @@ public:
 
         if (filename == "../data/cube.in"){
             model_used = 1;
-            camera.setDistanceProjSphere(6.0f);
+            //camera.setDistanceProjSphere(6.0f);
+            close2gl.setDistanceProjSphere(6.0f);
         } else if (filename == "../data/cow_up.in") {
             model_used = 2;
-            camera.setDistanceProjSphere(g_max_total - g_min_total);
+            //camera.setDistanceProjSphere(g_max_total - g_min_total);
+            close2gl.setDistanceProjSphere(g_max_total - g_min_total);
         }
 
-        camera.setModel(model_used);
+        //camera.setModel(model_used);
+        close2gl.setModel(model_used);
 
         firstMouse = true;
     }
@@ -364,46 +368,49 @@ public:
             custom_shader.use();
 
             //create transformations
-            //glm::mat4 modelView     = close2gl.setModelViewMatrix();
-            //glm::mat4 projection    = close2gl.setProjectionMatrix();
-
+            glm::mat4 model         = glm::mat4(1.0f);
+            glm::mat4 view          = glm::mat4(1.0f);
+            glm::mat4 projection    = glm::mat4(1.0f);
 
             float center_x = (g_min_X+g_max_X)/2.0f;
             float center_y = (g_min_Y+g_max_Y)/2.0f;
             float center_z = (g_min_Z+g_max_Z)/2.0f;
 
-            //Translating the model to the origin (0,0,0)
-            /*glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-center_x, -center_y, -center_z));
-            model = trans * model;
+            //Translating the model to the origin (0,0,0) using manually implemented matrix class.
+            glm::mat4 trans = matrix.translate(glm::vec3(-center_x, -center_y, -center_z));
+            model = matrix.multiply_matrix(trans, model);
 
             //Normalizing and scaling cameraPos by distanceProjSphere
-            camera.cameraPos = glm::normalize(camera.cameraPos)*(camera.distanceProjSphere);
+            close2gl.position = matrix.normalizev3(close2gl.position)*(close2gl.distanceProjSphere);
 
             if(firstMouse){
-                view = camera.getLookAtMatrix();
+                view = close2gl.getLookAtMatrix();
                 
             } else {
-                view = camera.getLookAtMatrix();
+                view = close2gl.getLookAtMatrix();
                 
                 //Performing rotation
-                view = glm::rotate(view, camera.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-                view = glm::rotate(view, camera.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+                //view = matrix.rotate(view, close2gl.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+                //view = matrix.rotate(view, close2gl.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+                
+                //old way
+                view = glm::rotate(view, close2gl.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+                view = glm::rotate(view, close2gl.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
 
-            projection = glm::perspective(glm::radians(camera.fov),
+            projection = glm::perspective(glm::radians(close2gl.fov),
                                             ((float)this->width())/this->height(),
                                             g_near_plane, g_far_plane);
 
+
+            glm::mat4 modelViewProj = projection * view * model;
+
             // retrieve the matrix uniform locations
-            unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
-            unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
-            unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
+            unsigned int modelViewProjLoc = glGetUniformLocation(custom_shader.ID, "modelViewProjection");
             unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
 
-            // pass them to the shaders (3 different ways)
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-            glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+            // pass matrix uniform locations to the shaders
+            glUniformMatrix4fv(modelViewProjLoc, 1, GL_FALSE, glm::value_ptr(modelViewProj));
             glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
 
             glBindVertexArray(VAO);
@@ -430,7 +437,7 @@ public:
             else if (drawing_mode == 3)
                 glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
             
-            glDisable(GL_DEPTH_TEST);*/
+            glDisable(GL_DEPTH_TEST);
         }
     }
 
@@ -601,7 +608,7 @@ public:
             fov = 45.0f;
 
         mCanvasObject->camera.fov = fov;
-        mCanvasObjectC2GL->camera.fov = fov;
+        mCanvasObjectC2GL->close2gl.fov = fov;
     }
 
     virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
@@ -632,11 +639,13 @@ public:
             if (pitch < -89.0f)
                 pitch = -89.0f;
 
+            //Setting new yaw and pitch values for opengl canvas
             mCanvasObject->camera.yaw = yaw;
             mCanvasObject->camera.pitch = pitch;
 
-            mCanvasObjectC2GL->camera.yaw = yaw;
-            mCanvasObjectC2GL->camera.pitch = pitch;
+            //Setting new yaw and pitch values for close2gl canvas
+            mCanvasObjectC2GL->close2gl.yaw = yaw;
+            mCanvasObjectC2GL->close2gl.pitch = pitch;
         }
 
         return true;
@@ -659,7 +668,7 @@ public:
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
                 mCanvasObject->camera.processRotation(FORWARD);
-                mCanvasObjectC2GL->camera.processRotation(FORWARD);
+                mCanvasObjectC2GL->close2gl.processRotation(FORWARD);
 
                 return true;
             }
@@ -670,7 +679,7 @@ public:
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
                 mCanvasObject->camera.processRotation(BACKWARD);
-                mCanvasObjectC2GL->camera.processRotation(BACKWARD);
+                mCanvasObjectC2GL->close2gl.processRotation(BACKWARD);
 
                 return true;
             }
@@ -682,7 +691,7 @@ public:
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
                 mCanvasObject->camera.processRotation(RIGHT);
-                mCanvasObjectC2GL->camera.processRotation(RIGHT);
+                mCanvasObjectC2GL->close2gl.processRotation(RIGHT);
 
                 return true;
             }
@@ -692,7 +701,7 @@ public:
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
                 mCanvasObject->camera.processRotation(LEFT);
-                mCanvasObjectC2GL->camera.processRotation(LEFT);
+                mCanvasObjectC2GL->close2gl.processRotation(LEFT);
 
                 return true;
             }
@@ -702,7 +711,7 @@ public:
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
                 mCanvasObject->camera.processRotation(UP);
-                mCanvasObjectC2GL->camera.processRotation(UP);
+                mCanvasObjectC2GL->close2gl.processRotation(UP);
 
                 return true;
             }
@@ -712,7 +721,7 @@ public:
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
                 mCanvasObject->camera.processRotation(DOWN);
-                mCanvasObjectC2GL->camera.processRotation(DOWN);
+                mCanvasObjectC2GL->close2gl.processRotation(DOWN);
 
                 return true;
             }
