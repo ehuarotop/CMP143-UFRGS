@@ -45,9 +45,6 @@ public:
     float fov;
     int model_used;
     float distanceProjSphere = 0.0f;
-    float translateCamX;
-    float translateCamY;
-    float translateCamZ;
 
     Camera(){
     	//Initializing general attributes 
@@ -66,9 +63,6 @@ public:
         cameraFront = glm::vec3(0.0f,0.0f,-1.0f);
         cameraUp = glm::vec3(0.0f,1.0f,0.0f);
         cameraRight = glm::vec3(1.0f,0.0f,0.0f);
-        translateCamZ = 0.0f;
-        translateCamX = 0.0f;
-        translateCamY = 0.0f;
 
     	if(model == 1){
     		model_used = 1;

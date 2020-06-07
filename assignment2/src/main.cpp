@@ -206,6 +206,7 @@ public:
 
             if(firstMouse){
                 view = camera.getLookAtMatrix();
+                cout<<glm::to_string(view)<<endl;
             } else {
                 view = camera.getLookAtMatrix();
                 
@@ -332,11 +333,9 @@ public:
 
         if (filename == "../data/cube.in"){
             model_used = 1;
-            //camera.setDistanceProjSphere(6.0f);
             close2gl.setDistanceProjSphere(6.0f);
         } else if (filename == "../data/cow_up.in") {
             model_used = 2;
-            //camera.setDistanceProjSphere(g_max_total - g_min_total);
             close2gl.setDistanceProjSphere(g_max_total - g_min_total);
         }
 
@@ -385,7 +384,8 @@ public:
 
             if(firstMouse){
                 view = close2gl.getLookAtMatrix();
-                
+                cout<<glm::to_string(view)<<endl;
+                cout<<"-------------------"<<endl;
             } else {
                 view = close2gl.getLookAtMatrix();
                 
@@ -438,6 +438,10 @@ public:
                 glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
             
             glDisable(GL_DEPTH_TEST);
+
+            // Swap buffers
+            //glfwSwapBuffers(window);
+            glfwPollEvents();
         }
     }
 

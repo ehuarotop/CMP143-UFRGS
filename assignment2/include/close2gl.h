@@ -6,24 +6,13 @@
 #include <iostream>
 #include <matrix.h>
 
-//Initial camera values
-/*const float INITIAL_YAW         		= -90.0f;
-const float INITIAL_PITCH       		=  0.0f;
-const float SPEED_MODEL_1				=  1.0f;
-const float SPEED_MODEL_1_FB			=  0.25f;
-const float SPEED_MODEL_2				=  60.0f;
-const float SPEED_MODEL_2_FB			=  15.0f;
-const float INITIAL_SENSITIVITY_MODEL1 	=  0.25f;
-const float INITIAL_SENSITIVITY_MODEL2 	=  0.1f;
-const float INITIAL_FOV       			=  45.0f;*/
-
 class Close2GL{
 public:
 
 	glm::vec3 position;
-	glm::vec3 front;  //n
+	glm::vec3 right;   	//u
 	glm::vec3 up; 		//v
-	glm::vec3 right;   //u
+	glm::vec3 front;  	//n
 
 	glm::mat4 view = glm::mat4(0.0f); //view matrix
 
@@ -35,9 +24,6 @@ public:
     float fov;
     int model_used;
 	float distanceProjSphere = 0.0f;
-	float translateCamX;
-    float translateCamY;
-    float translateCamZ;
 
 	Matrix matrix = Matrix();
 
@@ -58,9 +44,6 @@ public:
         front = glm::vec3(0.0f,0.0f,-1.0f);
         up = glm::vec3(0.0f,1.0f,0.0f);
         right = glm::vec3(1.0f,0.0f,0.0f);
-        translateCamZ = 0.0f;
-        translateCamX = 0.0f;
-        translateCamY = 0.0f;
 
     	if(model == 1){
     		model_used = 1;
@@ -75,12 +58,11 @@ public:
 
 	void lookAt(glm::vec3 position, glm::vec3 lookat, glm::vec3 up){
 
-		front = glm::vec3(position.x - lookat.x, position.y - lookat.y, position.z - lookat.z);
-		
-		front = matrix.normalizev3(front);
+		//front = matrix.normalizev3(glm::vec3(position.x - lookat.x, position.y - lookat.y, position.z - lookat.z));
+		front = matrix.normalizev3(glm::vec3(lookat.x, lookat.y, lookat.z));
 
-		right = glm::cross(up, front);
-		up = glm::cross(front, right);
+		right = matrix.normalizev3(matrix.crossProduct(up, front));
+		up = matrix.normalizev3(matrix.crossProduct(front, right));
 		
 		view = getModelViewMatrix();
 	}
