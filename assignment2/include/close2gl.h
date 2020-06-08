@@ -6,6 +6,8 @@
 #include <iostream>
 #include <matrix.h>
 
+#define PI 3.14159265
+
 class Close2GL{
 public:
 
@@ -41,9 +43,9 @@ public:
     void setModel(int model){
 
     	position = glm::vec3(0.0f, 0.0f, distanceProjSphere);
-        front = glm::vec3(0.0f,0.0f,-1.0f);
-        up = glm::vec3(0.0f,1.0f,0.0f);
-        right = glm::vec3(1.0f,0.0f,0.0f);
+        front = glm::vec3(0.0f,0.0f,-1.0f); //n
+        up = glm::vec3(0.0f,1.0f,0.0f); //v
+        right = glm::vec3(1.0f,0.0f,0.0f); //u
 
     	if(model == 1){
     		model_used = 1;
@@ -86,58 +88,57 @@ public:
 		return m;
 	}
 
-
 	void processRotation(camera_movement movement_direction){
     	if (movement_direction == FORWARD){
-    		position += movementSpeed_FB * front;
+    		position -= movementSpeed_FB * front;
 
     		//Updating distance Projection Sphere
     		distanceProjSphere = glm::length(position);
     	}else if (movement_direction == BACKWARD){
-    		position -= movementSpeed_FB * front;
+    		position += movementSpeed_FB * front;
 
     		//Updating distance Projection Sphere
     		distanceProjSphere = glm::length(position);
     	}else if (movement_direction == RIGHT){
     		//Calculating update for right
-    		right = glm::normalize(-glm::cross(front, up));
+    		right = glm::normalize(glm::cross(up, front));
 
     		//Calculating new Camera position
-    		position +=  right * movementSpeed;
+    		position -=  right * movementSpeed;
 
     		//Updating front
-    		front = glm::normalize(-position);
+    		front = glm::normalize(position);
 
     	}else if (movement_direction == LEFT){
     		//Calculating update for camera right
-    		right = glm::normalize(-glm::cross(front, up));
+    		right = glm::normalize(glm::cross(up, front));
 
     		//Calculating new Camera position
-    		position -= right * movementSpeed;
+    		position += right * movementSpeed;
 
     		//Updating front
-    		front = glm::normalize(-position);
+    		front = glm::normalize(position);
 
-    	}else if (movement_direction == UP){
+    	} /*else if (movement_direction == UP){
     		//Calculating update for up
-    		up = glm::normalize(-glm::cross(front, right));
-
-    		//Calculating new Camera Position
-    		position += up * movementSpeed;
-
-    		//Updating camera front
-    		front = glm::normalize(-position);
-
-    	}else if (movement_direction == DOWN){
-    		//Calculating update for up
-    		up = glm::normalize(-glm::cross(front, right));
+    		up = glm::normalize(glm::cross(right, front));
 
     		//Calculating new Camera Position
     		position -= up * movementSpeed;
 
     		//Updating camera front
-    		front = glm::normalize(-position);
-    	}
+    		front = glm::normalize(position);
+
+    	}else if (movement_direction == DOWN){
+    		//Calculating update for up
+    		up = glm::normalize(glm::cross(right, front));
+
+    		//Calculating new Camera Position
+    		position += up * movementSpeed;
+
+    		//Updating camera front
+    		front = glm::normalize(position);
+    	}*/
 	}
 
 };

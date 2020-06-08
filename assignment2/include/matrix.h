@@ -52,22 +52,44 @@ public:
 
 	}
 
+	glm::mat4 pitchRotate(glm::mat4 matrix, float angle){
+		float cosa = cos(angle * PI/180.0f);
+		float sina = sin(angle * PI/180.0f);
+
+		glm::mat4 m; //rotation matrix around x axis
+
+		m[0][0] = 1.0f;		m[1][0] = 0.0f;		m[2][0] = 0.0f;		m[3][0] = 0;
+		m[0][1] = 0.0f;		m[1][1] = cosa;		m[2][1] = sina;		m[3][1] = 0;
+		m[0][2] = 0.0f;		m[1][2] = -sina;	m[2][2] = cosa;		m[3][2] = 0;
+		m[0][3] = 0.0f;		m[1][3] = 0.0f;		m[2][3] = 0.0f;		m[3][3] = 1.0f;
+
+		return multiply_matrix(m, matrix);
+	}
+
 	glm::mat4 rotate(glm::mat4 matrix, float angle, glm::vec3 axis){
 
-		float sina = sin(angle * PI/180.0f);
-		float cosa = cos(angle * PI/180.0f);
+		float sina = sin(angle);
+		float cosa = cos(angle);
 
-		matrix[0][0] = cosa + (1-cosa)*axis.x;					matrix[1][0] = (1-cosa)*axis.x*axis.y + sina*axis.z;	matrix[2][0] = (1-cosa)*axis.x*axis.z - sina*axis.y;	matrix[3][0] = 0;
-		matrix[0][1] = (1-cosa)*axis.y*axis.x - sina*axis.z;	matrix[1][1] = cosa + (1-cosa)*pow(axis.y, 2);			matrix[2][1] = (1-cosa)*axis.y*axis.z - sina*axis.x;	matrix[3][1] = 0;
-		matrix[0][2] = (1-cosa)*axis.z*axis.x + sina*axis.y;	matrix[1][2] = (1-cosa)*axis.z*axis.z - sina*axis.x;	matrix[2][2] = cosa + (1-cosa)*pow(axis.z, 2);			matrix[3][2] = 0;
-		matrix[0][3] = 0.0f;									matrix[1][3] = 0.0f;									matrix[2][3] = 0.0f;									matrix[3][3] = 1.0f;
+		//axis = normalizev3(axis);
+
+		float x = axis.x;
+		float y = axis.y;
+		float z = axis.z;
+
+		glm::mat4 rotate;
+
+		rotate[0][0] = cosa + (1.0f-cosa)*pow(x,2);		rotate[1][0] = (1.0f-cosa)*x*y - sina*z;		rotate[2][0] = (1.0f-cosa)*x*z + sina*y;		rotate[3][0] = 0.0f;
+		rotate[0][1] = (1.0f-cosa)*y*x + sina*z;		rotate[1][1] = cosa + (1.0f-cosa)*pow(y, 2);	rotate[2][1] = (1.0f-cosa)*y*z - sina*x;		rotate[3][1] = 0.0f;
+		rotate[0][2] = (1.0f-cosa)*z*x - sina*y;		rotate[1][2] = (1.0f-cosa)*z*y + sina*x;		rotate[2][2] = cosa + (1.0f-cosa)*pow(z, 2);	rotate[3][2] = 0.0f;
+		rotate[0][3] = 0.0f;							rotate[1][3] = 0.0f;							rotate[2][3] = 0.0f;							rotate[3][3] = 1.0f;
 
 		/*matrix[0][0] = cosa + (1-cosa)*axis.x;					matrix[1][0] = (1-cosa)*axis.x*axis.y + sina*axis.z;	matrix[2][0] = (1-cosa)*axis.x*axis.z - sina*axis.y;	matrix[3][0] = 0;
 		matrix[0][1] = (1-cosa)*axis.y*axis.x - sina*axis.z;	matrix[1][1] = cosa + (1-cosa)*pow(axis.y, 2);			matrix[2][1] = (1-cosa)*axis.y*axis.z - sina*axis.x;	matrix[3][1] = 0;
 		matrix[0][2] = (1-cosa)*axis.z*axis.x + sina*axis.y;	matrix[1][2] = (1-cosa)*axis.z*axis.z - sina*axis.x;	matrix[2][2] = cosa + (1-cosa)*pow(axis.z, 2);			matrix[3][2] = 0;
 		matrix[0][3] = 0.0f;									matrix[1][3] = 0.0f;									matrix[2][3] = 0.0f;									matrix[3][3] = 1.0f;*/
 
-		return matrix;
+		return multiply_matrix(rotate, matrix);
 	}
 
 	float dotProduct(glm::vec3 vec1, glm::vec3 vec2){

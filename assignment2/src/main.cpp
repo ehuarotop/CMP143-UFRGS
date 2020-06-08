@@ -206,13 +206,15 @@ public:
 
             if(firstMouse){
                 view = camera.getLookAtMatrix();
-                cout<<glm::to_string(view)<<endl;
             } else {
                 view = camera.getLookAtMatrix();
                 
+                //cout<<glm::to_string(view)<<endl;
+
                 //Performing rotation
                 view = glm::rotate(view, camera.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-                view = glm::rotate(view, camera.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+                cout<<glm::to_string(view)<<endl;
+                //view = glm::rotate(view, camera.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
 
             projection = glm::perspective(glm::radians(camera.fov),
@@ -384,18 +386,21 @@ public:
 
             if(firstMouse){
                 view = close2gl.getLookAtMatrix();
-                cout<<glm::to_string(view)<<endl;
-                cout<<"-------------------"<<endl;
             } else {
                 view = close2gl.getLookAtMatrix();
                 
+                //cout<<glm::to_string(view)<<endl;
+
                 //Performing rotation
-                //view = matrix.rotate(view, close2gl.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+                //view = matrix.pitchRotate(view, close2gl.pitch);
+                view = matrix.rotate(view, close2gl.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+                cout<<glm::to_string(view)<<endl;
+                cout<<"-------------------------------------"<<endl;
                 //view = matrix.rotate(view, close2gl.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
                 
                 //old way
-                view = glm::rotate(view, close2gl.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-                view = glm::rotate(view, close2gl.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+                //view = glm::rotate(view, close2gl.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+                //view = glm::rotate(view, close2gl.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
 
             projection = glm::perspective(glm::radians(close2gl.fov),
