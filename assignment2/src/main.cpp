@@ -60,9 +60,24 @@
 using namespace std;
 using namespace nanogui;
 
+//Defining struct for triangle
+struct Triangle {
+    glm::vec3 v0, v1, v2, face_normal;
+    glm::vec3 normal[3];
+    float Color[3];
+};
+
+//Defining struct for triangle (close2gl)
+struct Triangle_c2gl {
+    glm::vec4 v0, v1, v2;
+    glm::vec3 face_normal, normal[3];
+    float Color[3];  
+};
+
 ///////////////////////// FUNCTION DECLARATION /////////////////////////
 //function to read files with extension .in (models)
 unsigned int readFile(const char* filename);
+vector<Triangle_c2gl> readFile_close2gl(const char* filename);
 
 ///////////////////////// GLOBAL VARIABLES /////////////////////////
 //// DATA ////
@@ -86,13 +101,6 @@ float fov   =  60.0f;
 std::string text_textBox = "";
 float g_near_plane = 1.0f;
 float g_far_plane = 3000.0f;
-
-//Defining struct for triangle
-struct Triangle {
-    glm::vec3 v0, v1, v2, face_normal;
-    glm::vec3 normal[3];
-    float Color[3];
-};
 
 ///////////////////////////////// CANVAS DECLARATION OPENGL /////////////////////////////////
 class MyGLCanvas : public GLCanvas{
@@ -276,6 +284,7 @@ public:
     //Camera camera = Camera();
     Close2GL close2gl = Close2GL();
     Matrix matrix = Matrix();
+    vector<Triangle_c2gl> triangles;
     float deltaTime = 0.0f; // time between current frame and last frame
     float lastFrame = 0.0f;
     float distanceProjSphere = 0.0f;
@@ -297,7 +306,7 @@ public:
 
     void setModel(const char* filename){
         this->model_filename = filename;
-        VAO = readFile(model_filename);
+        triangles = readFile_close2gl(model_filename);
 
         //Getting min and max total
         ////// MIN /////
@@ -396,17 +405,82 @@ public:
                                                         ((float)this->width())/this->height(),
                                                         g_near_plane, g_far_plane);
 
+
+            //Calculating the model view projection matrix
             glm::mat4 modelViewProj = projection * view * model;
 
+            for (int i=0; i<triangles.size(); i++){
+                //Multiplying each vertex by the modelViewProjection to obtain projected vertexs
+                triangles[i].v0 = matrix.multiply_matrix_vector(modelViewProj, glm::vec4(triangles[i].v0));
+                triangles[i].v1 = matrix.multiply_matrix_vector(modelViewProj, glm::vec4(triangles[i].v1));
+                triangles[i].v2 = matrix.multiply_matrix_vector(modelViewProj, glm::vec4(triangles[i].v2));
+            }
+
+            vector<Triangle_c2gl> clipped_triangles = triangles;
+
+            //Clipping (considering) only triangles inside the perspective volume
+            for(int i=0; i<triangles.size(): i++){
+                //Getting w position of each vertex
+                w0 = abs(triangles[i].v0.w);
+                w1 = abs(triangles[i].v1.w);
+                w2 = abd(triangles[i].v2.w);
+
+                if ( abs(triangles[i].v0.x) <= w0 && abs(triangles[i].v0.y <= w0) && abs(triangles[i].v0.z <= w0) && 
+                     abs(triangles[i].v1.x) <= w1 && abs(triangles[i].v1.y <= w1) && abs(triangles[i].v1.z <= w1) &&
+                     abs(triangles[i].v2.x) <= w2 && abs(triangles[i].v2.y <= w2) && abs(triangles[i].v2.z <= w2) ){
+
+                    clipped_triangles.push_back(triangles[i]);
+
+                }
+
+            }
+
+            //discarding triangles not eligible for rendering
+            triangles = clipped_triangles
+
+            //Getting viewport matrix
+            //glm::mat4 viewportMatrix = close2gl.getViewPortMatrix(0.0f, float(WINDOW_WIDTH), 0.0f, float(WINDOW_HEIGHT));
+
+            //Performing perspective division over the clipped triangles and transforming them with viewport matrix
+            for(int i=0; i<triangles.size(); i++){
+                triangles[i].v0 = triangles[i].v0 / triangles[i].v0.w;
+                triangles[i].v1 = triangles[i].v1 / triangles[i].v1.w;
+                triangles[i].v2 = triangles[i].v2 / triangles[i].v2.w;
+
+                /*triangles[i].v0 = matrix.multiply_matrix_vector(viewportMatrix, triangles[i].v0);
+                triangles[i].v1 = matrix.multiply_matrix_vector(viewportMatrix, triangles[i].v1);
+                triangles[i].v2 = matrix.multiply_matrix_vector(viewportMatrix, triangles[i].v2);*/
+
+            }
+
             // retrieve the matrix uniform locations
-            unsigned int modelViewProjLoc = glGetUniformLocation(custom_shader.ID, "modelViewProjection");
+            //unsigned int modelViewProjLoc = glGetUniformLocation(custom_shader.ID, "modelViewProjection");
             unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
 
             // pass matrix uniform locations to the shaders
-            glUniformMatrix4fv(modelViewProjLoc, 1, GL_FALSE, glm::value_ptr(modelViewProj));
+            //glUniformMatrix4fv(modelViewProjLoc, 1, GL_FALSE, glm::value_ptr(modelViewProj));
             glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
 
+            unsigned int VBO, VAO;
+            glGenVertexArrays(1, &VAO);
+            
+            // binding the Vertex Array Object.
             glBindVertexArray(VAO);
+
+            /////////////  Binding buffer for vertex VBO //////////////////////
+            glGenBuffers(1, &VBO);
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            //Putting buffer data
+            glBufferData(GL_ARRAY_BUFFER, num_triangles*9*sizeof(GL_FLOAT), vert, GL_STATIC_DRAW);
+            //Position, # dimensions, data type, ##, 0, 0
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+            //Setting 0 in position (according to the specification on the shader)
+            glEnableVertexAttribArray(0);
+
+            //Unbinding the VBO buffer
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+            /*glBindVertexArray(VAO);
 
             if(culling_orientation == 1){
                 glEnable(GL_CULL_FACE);
@@ -430,11 +504,11 @@ public:
             else if (drawing_mode == 3)
                 glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
             
-            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_DEPTH_TEST);*/
 
             // Swap buffers
             //glfwSwapBuffers(window);
-            glfwPollEvents();
+            //glfwPollEvents();
         }
     }
 
@@ -981,6 +1055,150 @@ unsigned int readFile(const char* filename){
     glBindVertexArray(0);
 
     return VAO;
+}
+
+vector<Triangle_c2gl> readFile_close2gl(const char* filename){
+    vector<Triangle_c2gl> triangles;
+    char ch;
+    int num_triangles, material_count, i, color_index[3];
+
+    glm::vec3 ambient[MAX_MATERIAL_COUNT], 
+                diffuse[MAX_MATERIAL_COUNT], 
+                specular[MAX_MATERIAL_COUNT];
+
+    float shine[MAX_MATERIAL_COUNT];
+
+    FILE* fp = fopen(filename,"r");
+    if (fp==NULL) { printf("ERROR: unable to open TriObj [%s]!\n",filename); exit(1); }
+
+    // skiping the first line – object’s name
+    fscanf(fp, "%c", &ch);
+    while(ch!= '\n')
+        fscanf(fp, "%c", &ch);
+
+    // read # of triangles
+    fscanf(fp,"# triangles = %d\n", &num_triangles);
+    g_num_triangles = num_triangles; //Setting global variable for number of triangles
+    // read material count
+    fscanf(fp,"Material count = %d\n", &material_count);
+
+    for (i=0; i<material_count; i++) {
+        fscanf(fp, "ambient color %f %f %f\n", &(ambient[i].x), &(ambient[i].y), &(ambient[i].z));
+        fscanf(fp, "diffuse color %f %f %f\n", &(diffuse[i].x), &(diffuse[i].y), &(diffuse[i].z));
+        fscanf(fp, "specular color %f %f %f\n", &(specular[i].x), &(specular[i].y), &(specular[i].z));
+        fscanf(fp, "material shine %f\n", &(shine[i]));
+    }
+
+    // skiping documentation line
+    fscanf(fp, "%c", &ch);
+    while(ch!= '\n')
+        fscanf(fp, "%c", &ch);
+
+    // allocate triangles for tri model
+    printf ("Reading in %s (%d triangles). . .\n", filename, num_triangles);
+    struct Triangle_c2gl Tris[num_triangles];
+
+    //Setting all mins and maxs to zero in order to recalculate them
+    g_min_X=0.0f, g_max_X=0.0f, g_min_Y=0.0f, g_max_Y=0.0f, g_min_Z=0.0f, g_max_Z=0.0f;
+
+    for (i=0; i<num_triangles; i++) { // read triangles
+
+        fscanf(fp, "v0 %f %f %f %f %f %f %d\n",
+                &(Tris[i].v0.x), &(Tris[i].v0.y), &(Tris[i].v0.z),
+                &(Tris[i].normal[0].x), &(Tris[i]. normal [0].y), &(Tris[i]. normal [0].z),
+                &(color_index[0]));
+        
+        fscanf(fp, "v1 %f %f %f %f %f %f %d\n",
+                &(Tris[i].v1.x), &(Tris[i].v1.y), &(Tris[i].v1.z),
+                &(Tris[i].normal[1].x), &(Tris[i].normal[1].y), &(Tris[i].normal[1].z),
+                &(color_index[1]));
+        
+        fscanf(fp, "v2 %f %f %f %f %f %f %d\n",
+                &(Tris[i].v2.x), &(Tris[i].v2.y), &(Tris[i].v2.z),
+                &(Tris[i].normal[2].x), &(Tris[i].normal[2].y), &(Tris[i].normal[2].z),&(color_index[2]));
+        
+        fscanf(fp, "face normal %f %f %f\n", &(Tris[i].face_normal.x), &(Tris[i].face_normal.y),
+                &(Tris[i].face_normal.z));
+
+        //Adding the homegeneus component
+        Tris[i].v0.w = 1.0f;
+        Tris[i].v1.w = 1.0f;
+        Tris[i].v2.w = 1.0f;
+        
+        Tris[i].Color[0] = (unsigned char)(int)(255*(diffuse[color_index[0]].x));
+        Tris[i].Color[1] = (unsigned char)(int)(255*(diffuse[color_index[1]].y));
+        Tris[i].Color[2] = (unsigned char)(int)(255*(diffuse[color_index[2]].z));
+
+        //Getting min and max for X axis
+        if(Tris[i].v0.x < g_min_X){
+            g_min_X = Tris[i].v0.x;
+        }
+        if(Tris[i].v1.x < g_min_X){
+            g_min_X = Tris[i].v1.x;
+        }
+        if(Tris[i].v2.x < g_min_X){
+            g_min_X = Tris[i].v2.x;
+        }
+
+        if(Tris[i].v0.x > g_max_X){
+            g_max_X = Tris[i].v0.x;
+        }
+        if(Tris[i].v1.x > g_max_X){
+            g_max_X = Tris[i].v1.x;
+        }
+        if(Tris[i].v2.x > g_max_X){
+            g_max_X = Tris[i].v2.x;
+        }
+
+        //Getting min and max for Y axis
+        if(Tris[i].v0.y < g_min_Y){
+            g_min_Y = Tris[i].v0.y;
+        }
+        if(Tris[i].v1.y < g_min_Y){
+            g_min_Y = Tris[i].v1.y;
+        }
+        if(Tris[i].v2.y < g_min_Y){
+            g_min_Y = Tris[i].v2.y;
+        }
+
+        if(Tris[i].v0.y > g_max_Y){
+            g_max_Y = Tris[i].v0.y;
+        }
+        if(Tris[i].v1.y > g_max_Y){
+            g_max_Y = Tris[i].v1.y;
+        }
+        if(Tris[i].v2.y > g_max_Y){
+            g_max_Y = Tris[i].v2.y;
+        }
+
+        //Getting min and max for Z axis
+        if(Tris[i].v0.z < g_min_Z){
+            g_min_Z = Tris[i].v0.z;
+        }
+        if(Tris[i].v1.z < g_min_Z){
+            g_min_Z = Tris[i].v1.z;
+        }
+        if(Tris[i].v2.z < g_min_Z){
+            g_min_Z = Tris[i].v2.z;
+        }
+
+        if(Tris[i].v0.z > g_max_Z){
+            g_max_Z = Tris[i].v0.z;
+        }
+        if(Tris[i].v1.z > g_max_Z){
+            g_max_Z = Tris[i].v1.z;
+        }
+        if(Tris[i].v2.z > g_max_Z){
+            g_max_Z = Tris[i].v2.z;
+        }
+
+        triangles.push_back(Tris[i]);
+
+    }
+
+    fclose(fp);
+
+    return triangles;
 }
 
 int main(){

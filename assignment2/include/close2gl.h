@@ -109,6 +109,19 @@ public:
 		return p;	
 	}
 
+	glm::mat4 getViewPortMatrix(float lv, float rv, float bv, float tv){
+		glm::mat4 v = glm::mat4(0.0f);
+
+		//Setting model matrix
+
+		v[0][0] = (rv-lv)/2;	v[1][0] = 0.0f;			v[2][0] = 0.0f;		v[3][0] = (rv+lv)/2;
+		v[0][1] = 0.0f;			v[1][1] = (tv-bv)/2;	v[2][1] = 0.0f;		v[3][1] = (tv+bv)/2;
+		v[0][2] = 0.0f;			v[1][2] = 0.0f;			v[2][2] = 1.0f;		v[3][2] = 0.0f;
+		v[0][3] = 0.0f;			v[1][3] = 0.0f;			v[2][3] = 0.0f;		v[3][3] = 1.0f;
+
+		return v;
+	}
+
 	void processRotation(camera_movement movement_direction){
     	if (movement_direction == FORWARD){
     		position -= movementSpeed_FB * front;
