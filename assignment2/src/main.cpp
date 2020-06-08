@@ -82,7 +82,7 @@ float lastY =  (float)(WINDOW_HEIGHT) / 2.0;
 float translateCamZ = 0.0f;
 float translateCamX = 0.0f;
 float translateCamY = 0.0f;
-float fov   =  45.0f;
+float fov   =  60.0f;
 std::string text_textBox = "";
 float g_near_plane = 1.0f;
 float g_far_plane = 3000.0f;
@@ -208,13 +208,10 @@ public:
                 view = camera.getLookAtMatrix();
             } else {
                 view = camera.getLookAtMatrix();
-                
-                //cout<<glm::to_string(view)<<endl;
 
                 //Performing rotation
                 view = glm::rotate(view, camera.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-                cout<<glm::to_string(view)<<endl;
-                //view = glm::rotate(view, camera.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+                view = glm::rotate(view, camera.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
 
             projection = glm::perspective(glm::radians(camera.fov),
@@ -388,25 +385,16 @@ public:
                 view = close2gl.getLookAtMatrix();
             } else {
                 view = close2gl.getLookAtMatrix();
-                
-                //cout<<glm::to_string(view)<<endl;
 
                 //Performing rotation
-                //view = matrix.pitchRotate(view, close2gl.pitch);
                 view = matrix.rotate(view, close2gl.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-                cout<<glm::to_string(view)<<endl;
-                cout<<"-------------------------------------"<<endl;
-                //view = matrix.rotate(view, close2gl.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+                view = matrix.rotate(view, close2gl.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
                 
-                //old way
-                //view = glm::rotate(view, close2gl.pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-                //view = glm::rotate(view, close2gl.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
             }
 
-            projection = glm::perspective(glm::radians(close2gl.fov),
-                                            ((float)this->width())/this->height(),
-                                            g_near_plane, g_far_plane);
-
+            projection = close2gl.getProjectionMatrix(glm::radians(close2gl.fov), 
+                                                        ((float)this->width())/this->height(),
+                                                        g_near_plane, g_far_plane);
 
             glm::mat4 modelViewProj = projection * view * model;
 

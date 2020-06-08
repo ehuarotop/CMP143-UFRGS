@@ -88,6 +88,27 @@ public:
 		return m;
 	}
 
+	glm::mat4 getProjectionMatrix(float fov, float aspect_ratio, float near_plane, float far_plane){
+		glm::mat4 p = glm::mat4(0.0f);
+
+		float n = near_plane;
+		float f = far_plane;
+
+		float t = tan(fov/2.0f) * n;
+		float b = -t;
+		float r = t*aspect_ratio;
+		float l = -t*aspect_ratio;
+
+		//Setting model matrix
+
+		p[0][0] = 2*n/(r-l);	p[1][0] = 0.0f;			p[2][0] = (r+l)/(r-l);		p[3][0] = 0.0f;
+		p[0][1] = 0.0f;			p[1][1] = 2*n/(t-b);	p[2][1] = (t+b)/(t-b);		p[3][1] = 0.0f;
+		p[0][2] = 0.0f;			p[1][2] = 0.0f;			p[2][2] = -(f+n)/(f-n);		p[3][2] = -(2*f*n)/(f-n);
+		p[0][3] = 0.0f;			p[1][3] = 0.0f;			p[2][3] = -1.0f;			p[3][3] = 0.0f;
+
+		return p;	
+	}
+
 	void processRotation(camera_movement movement_direction){
     	if (movement_direction == FORWARD){
     		position -= movementSpeed_FB * front;

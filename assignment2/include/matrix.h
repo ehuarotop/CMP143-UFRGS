@@ -71,8 +71,6 @@ public:
 		float sina = sin(angle);
 		float cosa = cos(angle);
 
-		//axis = normalizev3(axis);
-
 		float x = axis.x;
 		float y = axis.y;
 		float z = axis.z;
@@ -83,11 +81,6 @@ public:
 		rotate[0][1] = (1.0f-cosa)*y*x + sina*z;		rotate[1][1] = cosa + (1.0f-cosa)*pow(y, 2);	rotate[2][1] = (1.0f-cosa)*y*z - sina*x;		rotate[3][1] = 0.0f;
 		rotate[0][2] = (1.0f-cosa)*z*x - sina*y;		rotate[1][2] = (1.0f-cosa)*z*y + sina*x;		rotate[2][2] = cosa + (1.0f-cosa)*pow(z, 2);	rotate[3][2] = 0.0f;
 		rotate[0][3] = 0.0f;							rotate[1][3] = 0.0f;							rotate[2][3] = 0.0f;							rotate[3][3] = 1.0f;
-
-		/*matrix[0][0] = cosa + (1-cosa)*axis.x;					matrix[1][0] = (1-cosa)*axis.x*axis.y + sina*axis.z;	matrix[2][0] = (1-cosa)*axis.x*axis.z - sina*axis.y;	matrix[3][0] = 0;
-		matrix[0][1] = (1-cosa)*axis.y*axis.x - sina*axis.z;	matrix[1][1] = cosa + (1-cosa)*pow(axis.y, 2);			matrix[2][1] = (1-cosa)*axis.y*axis.z - sina*axis.x;	matrix[3][1] = 0;
-		matrix[0][2] = (1-cosa)*axis.z*axis.x + sina*axis.y;	matrix[1][2] = (1-cosa)*axis.z*axis.z - sina*axis.x;	matrix[2][2] = cosa + (1-cosa)*pow(axis.z, 2);			matrix[3][2] = 0;
-		matrix[0][3] = 0.0f;									matrix[1][3] = 0.0f;									matrix[2][3] = 0.0f;									matrix[3][3] = 1.0f;*/
 
 		return multiply_matrix(rotate, matrix);
 	}
