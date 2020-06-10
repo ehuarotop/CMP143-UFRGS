@@ -42,6 +42,19 @@ public:
 		return result_vec;
 	}
 
+	glm::vec4 transform_vector(glm::vec4 vec, glm::mat4 matrix){
+		//Creating temporal vec to save the initial vec
+		glm::vec4 v = vec;
+
+		vec.x = v.x * matrix[0][0] + v.y*matrix[1][0] + v.z*matrix[2][0] + v.w*matrix[3][0];
+		vec.y = v.x * matrix[0][1] + v.y*matrix[1][1] + v.z*matrix[2][1] + v.w*matrix[3][1];
+		vec.z = v.x * matrix[0][2] + v.y*matrix[1][2] + v.z*matrix[2][2] + v.w*matrix[3][2];
+		vec.w = v.x * matrix[0][3] + v.y*matrix[1][3] + v.z*matrix[2][3] + v.w*matrix[3][3];
+
+		return vec;
+
+	}
+
 	glm::mat4 translate(glm::vec3 vector){
 		glm::mat4 translation = glm::mat4(1.0f);
 		translation[3][0] = vector.x;
