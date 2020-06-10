@@ -420,9 +420,13 @@ public:
 
             for (int i=0; i<triangles.size(); i++){
 
-                triangles[i].v0 = matrix.multiply_matrix_vector(modelViewProj, triangles[i].v0);
+                /*triangles[i].v0 = matrix.multiply_matrix_vector(modelViewProj, triangles[i].v0);
                 triangles[i].v1 = matrix.multiply_matrix_vector(modelViewProj, triangles[i].v1);
-                triangles[i].v2 = matrix.multiply_matrix_vector(modelViewProj, triangles[i].v2);
+                triangles[i].v2 = matrix.multiply_matrix_vector(modelViewProj, triangles[i].v2);*/
+
+                triangles[i].v0 = matrix.transform_vector(triangles[i].v0, modelViewProj);
+                triangles[i].v1 = matrix.transform_vector(triangles[i].v1, modelViewProj);
+                triangles[i].v2 = matrix.transform_vector(triangles[i].v2, modelViewProj);
 
             }
 
@@ -446,7 +450,7 @@ public:
 
             }
 
-            glm::mat4 viewportMatrix = close2gl.getViewPortMatrix(0.0f, float(WINDOW_WIDTH), float(WINDOW_HEIGHT), 0.0f);
+            //glm::mat4 viewportMatrix = close2gl.getViewPortMatrix(0.0f, float(WINDOW_WIDTH), float(WINDOW_HEIGHT), 0.0f);
 
             //Performing perspective division over the clipped triangles and transforming them with viewport matrix
             for(int i=0; i<clipped_triangles.size(); i++){
@@ -460,7 +464,27 @@ public:
 
             }
 
+            /*for(int i=0; i<clipped_triangles.size(); i++){
+                cout<<glm::to_string(clipped_triangles[i].v0)<<endl;
+                cout<<glm::to_string(clipped_triangles[i].v1)<<endl;
+                cout<<glm::to_string(clipped_triangles[i].v2)<<endl;
+            }*/
+
             //Converting triangles to array in order to pass it to shader
+            /*float vert[9*clipped_triangles.size()];
+
+            for(int i=0; i < clipped_triangles.size(); i++){
+                vert[9*i]   = clipped_triangles[i].v0.x; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
+                vert[9*i+1] = clipped_triangles[i].v0.y; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
+                vert[9*i+2] = clipped_triangles[i].v0.z; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
+                vert[9*i+3] = clipped_triangles[i].v1.x; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
+                vert[9*i+4] = clipped_triangles[i].v1.y; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
+                vert[9*i+5] = clipped_triangles[i].v1.z; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
+                vert[9*i+6] = clipped_triangles[i].v2.x; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
+                vert[9*i+7] = clipped_triangles[i].v2.y; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
+                vert[9*i+8] = clipped_triangles[i].v2.z; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
+            }*/
+
             float vert[6*clipped_triangles.size()];
 
             for(int i=0; i < clipped_triangles.size(); i++){
@@ -472,7 +496,35 @@ public:
                 vert[6*i+5] = clipped_triangles[i].v2.y; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
             }
 
-            //glViewport(0,0, WINDOW_WIDTH, WINDOW_HEIGHT);
+            unsigned int VBO, VAO;
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+            // binding the Vertex Array Object.
+            glBindVertexArray(VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            //Putting buffer data
+            //glBufferData(GL_ARRAY_BUFFER, clipped_triangles.size()*6*sizeof(GL_FLOAT), vert, GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vert), vert, GL_STATIC_DRAW);
+            //Position, # dimensions, data type, ##, 0, 0
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+            //Setting 0 in position (according to the specification on the shader)
+            glEnableVertexAttribArray(0);
+
+            if(drawing_mode == 1){
+                glDrawArrays(GL_POINTS, 0, clipped_triangles.size()*3);
+            } else if (drawing_mode == 2){
+                glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+                glDrawArrays(GL_TRIANGLES, 0, clipped_triangles.size()*3);
+                glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+            }
+            else if (drawing_mode == 3)
+                glDrawArrays(GL_TRIANGLES, 0, clipped_triangles.size()*3);
+
+            //Actual Drawing
+            //glDrawArrays(GL_TRIANGLES, 0, clipped_triangles.size()*3);
+
+            //Unbinding the VBO buffer
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
             // retrieve the matrix uniform locations
             unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
@@ -480,24 +532,8 @@ public:
             // pass matrix uniform locations to the shaders
             glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
 
-            unsigned int VBO, VAO;
-            glGenVertexArrays(1, &VAO);
             
-            // binding the Vertex Array Object.
-            glBindVertexArray(VAO);
 
-            /////////////  Binding buffer for vertex VBO //////////////////////
-            glGenBuffers(1, &VBO);
-            glBindBuffer(GL_ARRAY_BUFFER, VBO);
-            //Putting buffer data
-            glBufferData(GL_ARRAY_BUFFER, clipped_triangles.size()*6*sizeof(GL_FLOAT), vert, GL_STATIC_DRAW);
-            //Position, # dimensions, data type, ##, 0, 0
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-            //Setting 0 in position (according to the specification on the shader)
-            glEnableVertexAttribArray(0);
-
-            //Actual Drawing
-            glDrawArrays(GL_TRIANGLES, 0, clipped_triangles.size()*3);
 
             /*glBindVertexArray(VAO);
 
@@ -524,9 +560,6 @@ public:
                 glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
             
             glDisable(GL_DEPTH_TEST);*/
-
-            //Unbinding the VBO buffer
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
             // Swap buffers
             //glfwSwapBuffers(window);
