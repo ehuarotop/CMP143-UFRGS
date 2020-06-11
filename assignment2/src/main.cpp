@@ -102,6 +102,9 @@ std::string text_textBox = "";
 float g_near_plane = 1.0f;
 float g_far_plane = 3000.0f;
 
+int fpsrate_opengl = 0.0f;
+int fpsrate_close2gl = 0.0f;
+
 
 //Debugging
 int count_print;
@@ -116,6 +119,10 @@ public:
     float lastFrame = 0.0f;
     float distanceProjSphere = 0.0f;
 
+    //variables for fps rate
+    int framesPerSecond = 0;
+    float lastTime = 0.0f;
+
     MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex.glsl", "../src/shader_fragment.glsl"){
 
         //Setting initial color to white
@@ -123,6 +130,9 @@ public:
 
         //Setting initial drawing mode to 3 -> solid polygons
         this->drawing_mode = 3;
+
+        //Setting initial culling orientation to clockwise
+        //this->culling_orientation = 1;
 
         //Reading file with the information corresponding to the cube
         custom_shader.use();
@@ -192,6 +202,15 @@ public:
     }
 
     virtual void drawGL() override {
+
+        double currentTime = glfwGetTime();
+        ++framesPerSecond;
+
+        if(currentTime - lastTime > 1.0f){
+            lastTime = currentTime;
+            fpsrate_opengl = framesPerSecond;
+            framesPerSecond = 0;
+        }
 
         if (model_used == 0){
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -291,9 +310,12 @@ public:
     vector<Triangle_c2gl> read_triangles;
     vector<Triangle_c2gl> triangles;
     vector<Triangle_c2gl> clipped_triangles;
-    float deltaTime = 0.0f; // time between current frame and last frame
-    float lastFrame = 0.0f;
+    vector<Triangle_c2gl> temp;
     float distanceProjSphere = 0.0f;
+
+    //variables for fps rate
+    int framesPerSecond = 0;
+    float lastTime = 0.0f;
 
     MyGLCanvasC2GL(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex_c2gl.glsl", "../src/shader_fragment_c2gl.glsl"){
 
@@ -302,6 +324,9 @@ public:
 
         //Setting initial drawing mode to 3 -> solid polygons
         this->drawing_mode = 3;
+
+        //Setting initial culling orientation to clockwise
+        //this->culling_orientation = 1;
 
         //Reading file with the information corresponding to the cube
         custom_shader.use();
@@ -373,6 +398,15 @@ public:
 
     virtual void drawGL() override {
 
+        double currentTime = glfwGetTime();
+        ++framesPerSecond;
+
+        if(currentTime - lastTime > 1.0f){
+            lastTime = currentTime;
+            fpsrate_close2gl = framesPerSecond;
+            framesPerSecond = 0;
+        }
+
         if (model_used == 0){
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
@@ -440,15 +474,62 @@ public:
                 float w1 = abs(triangles[i].v1.w);
                 float w2 = abs(triangles[i].v2.w);
 
-                if ( abs(triangles[i].v0.x) <= w0 && abs(triangles[i].v0.y <= w0) && abs(triangles[i].v0.z <= w0) && 
-                     abs(triangles[i].v1.x) <= w1 && abs(triangles[i].v1.y <= w1) && abs(triangles[i].v1.z <= w1) &&
-                     abs(triangles[i].v2.x) <= w2 && abs(triangles[i].v2.y <= w2) && abs(triangles[i].v2.z <= w2) ){
-
+                if ( abs(triangles[i].v0.z) <= w0 && abs(triangles[i].v1.z) <= w1 && abs(triangles[i].v2.z <= w2)){
                     clipped_triangles.push_back(triangles[i]);
-
                 }
 
             }
+
+            //cout<<clipped_triangles.size()<<endl;
+            //cout<<"------------------"<<endl;
+
+            //Performing backface culling, clearing temp_triangles.
+            /*temp.clear();
+            for(int i=0; i<clipped_triangles.size(); i++){
+
+                cout<<glm::to_string(close2gl.front)<<endl;
+
+                float dotProduct = matrix.dotProduct(close2gl.front, clipped_triangles[i].face_normal);
+
+                if(culling_orientation == 1){
+                    //clockwise
+                    if(dotProduct >= 0){
+                        temp.push_back(clipped_triangles[i]);
+                    }
+
+                    glFrontFace(GL_CW);
+                    
+                } else if (culling_orientation == 2){
+                    //counter clockwise
+                    if(dotProduct <= 0){
+                        temp.push_back(clipped_triangles[i]);
+                    }
+
+                    glFrontFace(GL_CCW);
+
+                } else {
+                    //Without back face culling
+                    temp.push_back(clipped_triangles[i]);
+                }
+            }
+
+            clipped_triangles = temp;*/
+
+            //cout<<clipped_triangles.size()<<endl;
+            //cout<<"----------------------"<<endl;
+
+            //Assigning temp triangles to clipped_triangles.
+            //clipped_triangles = temp;
+
+            /*if(culling_orientation == 1){
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                glFrontFace(GL_CW); 
+            }else if (culling_orientation == 2){
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                glFrontFace(GL_CCW);
+            }*/
 
             //glm::mat4 viewportMatrix = close2gl.getViewPortMatrix(0.0f, float(WINDOW_WIDTH), float(WINDOW_HEIGHT), 0.0f);
 
@@ -464,38 +545,52 @@ public:
 
             }
 
-            /*for(int i=0; i<clipped_triangles.size(); i++){
-                cout<<glm::to_string(clipped_triangles[i].v0)<<endl;
-                cout<<glm::to_string(clipped_triangles[i].v1)<<endl;
-                cout<<glm::to_string(clipped_triangles[i].v2)<<endl;
-            }*/
 
-            //Converting triangles to array in order to pass it to shader
-            /*float vert[9*clipped_triangles.size()];
+            //Performing backface culling
+            temp.clear();
+            for(int i=0; i<clipped_triangles.size(); i++){
+                glm::vec3 vecBA = clipped_triangles[i].v1 - clipped_triangles[i].v0;
+                glm::vec3 vecCA = clipped_triangles[i].v2 - clipped_triangles[i].v0;
 
-            for(int i=0; i < clipped_triangles.size(); i++){
-                vert[9*i]   = clipped_triangles[i].v0.x; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
-                vert[9*i+1] = clipped_triangles[i].v0.y; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
-                vert[9*i+2] = clipped_triangles[i].v0.z; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
-                vert[9*i+3] = clipped_triangles[i].v1.x; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
-                vert[9*i+4] = clipped_triangles[i].v1.y; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
-                vert[9*i+5] = clipped_triangles[i].v1.z; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
-                vert[9*i+6] = clipped_triangles[i].v2.x; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
-                vert[9*i+7] = clipped_triangles[i].v2.y; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
-                vert[9*i+8] = clipped_triangles[i].v2.z; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
-            }*/
+                glm::vec3 bfvec = matrix.crossProduct(vecBA, vecCA);
 
+                if(culling_orientation == 1){
+                    //clockwise
+                    if(bfvec.z < 0){
+                        temp.push_back(clipped_triangles[i]);
+                    }
+                } else if (culling_orientation == 2){
+                    if(bfvec.z > 0) {
+                        //counter clockwise
+                        temp.push_back(clipped_triangles[i]);
+                    }
+                } else {
+                    temp.push_back(clipped_triangles[i]);
+                }
+
+                //cout<<glm::to_string(bfvec)<<endl;
+            }
+
+            //cout<<"----------------------"<<endl;
+
+            clipped_triangles = temp;
+
+            //cout<<clipped_triangles.size()<<endl;
+
+
+            //Getting vertices in a 1d array to pass it to the shader
             float vert[6*clipped_triangles.size()];
 
             for(int i=0; i < clipped_triangles.size(); i++){
-                vert[6*i]   = clipped_triangles[i].v0.x; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
-                vert[6*i+1] = clipped_triangles[i].v0.y; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
-                vert[6*i+2] = clipped_triangles[i].v1.x; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
-                vert[6*i+3] = clipped_triangles[i].v1.y; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
-                vert[6*i+4] = clipped_triangles[i].v2.x; /// clipped_triangles[i].v0.w * WINDOW_WIDTH;
-                vert[6*i+5] = clipped_triangles[i].v2.y; /// clipped_triangles[i].v0.w * WINDOW_HEIGHT;
+                vert[6*i]   = clipped_triangles[i].v0.x;
+                vert[6*i+1] = clipped_triangles[i].v0.y;
+                vert[6*i+2] = clipped_triangles[i].v1.x;
+                vert[6*i+3] = clipped_triangles[i].v1.y;
+                vert[6*i+4] = clipped_triangles[i].v2.x;
+                vert[6*i+5] = clipped_triangles[i].v2.y;
             }
 
+            // Dealing with VAOs and VBOs
             unsigned int VBO, VAO;
             glGenVertexArrays(1, &VAO);
             glGenBuffers(1, &VBO);
@@ -503,12 +598,14 @@ public:
             glBindVertexArray(VAO);
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
             //Putting buffer data
-            //glBufferData(GL_ARRAY_BUFFER, clipped_triangles.size()*6*sizeof(GL_FLOAT), vert, GL_STATIC_DRAW);
             glBufferData(GL_ARRAY_BUFFER, sizeof(vert), vert, GL_STATIC_DRAW);
             //Position, # dimensions, data type, ##, 0, 0
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
             //Setting 0 in position (according to the specification on the shader)
             glEnableVertexAttribArray(0);
+
+            // ---------------- Actual Drawing ---------------- //
+            //glEnable(GL_DEPTH_TEST);
 
             if(drawing_mode == 1){
                 glDrawArrays(GL_POINTS, 0, clipped_triangles.size()*3);
@@ -520,50 +617,21 @@ public:
             else if (drawing_mode == 3)
                 glDrawArrays(GL_TRIANGLES, 0, clipped_triangles.size()*3);
 
-            //Actual Drawing
-            //glDrawArrays(GL_TRIANGLES, 0, clipped_triangles.size()*3);
+            //glDisable(GL_DEPTH_TEST);
+
+            // ---------------- Actual Drawing ---------------- //
+
 
             //Unbinding the VBO buffer
             glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-            // retrieve the matrix uniform locations
+
+            // Passing only color as uniform to the fragment shader. Retrieving the matrix uniform locations
             unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
 
             // pass matrix uniform locations to the shaders
             glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
 
-            
-
-
-            /*glBindVertexArray(VAO);
-
-            if(culling_orientation == 1){
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-                glFrontFace(GL_CW); 
-            }else if (culling_orientation == 2){
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-                glFrontFace(GL_CCW);
-            }
-
-            glEnable(GL_DEPTH_TEST);
-
-            if(drawing_mode == 1)
-                glDrawArrays(GL_POINTS, 0, g_num_triangles*3);
-            else if (drawing_mode == 2){
-                glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-                glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
-                glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-            }
-            else if (drawing_mode == 3)
-                glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
-            
-            glDisable(GL_DEPTH_TEST);*/
-
-            // Swap buffers
-            //glfwSwapBuffers(window);
-            //glfwPollEvents();*/
         }
     }
 
@@ -605,8 +673,9 @@ public:
     Window *windowGUI;
     MyTextBox *textBox_np;
     MyTextBox *textBox_fp;
+    MyTextBox *textBox_fpsrate;
 
-    App() : nanogui::Screen(Eigen::Vector2i(1250, 650), "Programming Assignment 1", false) {
+    App() : nanogui::Screen(Eigen::Vector2i(1250, 900), "Programming Assignment 1", false) {
         using namespace nanogui;
 
         // Printing to terminal opengl and glsl version
@@ -709,6 +778,12 @@ public:
 
 
         new Label(tools, "Culling Orientation", "sans-bold");
+        Button *normal = new Button(tools, "Without Culling");
+        normal->setCallback([this](){
+            //Setting culling orientation
+            mCanvasObject->setCullingOrientation(0);
+            mCanvasObjectC2GL->setCullingOrientation(0);
+        });
         Button *clockwise = new Button(tools, "Clockwise");
         clockwise->setCallback([this](){
             //Setting culling orientation
@@ -721,6 +796,13 @@ public:
             mCanvasObject->setCullingOrientation(2);
             mCanvasObjectC2GL->setCullingOrientation(2);
         });
+
+        new Label(tools, "FPS Rate");
+        textBox_fpsrate = new MyTextBox(tools);
+        textBox_fpsrate->setFixedSize(Vector2i(200, 25));
+        textBox_fpsrate->setValue("0.0f");
+        textBox_fpsrate->setUnits("fps");
+        textBox_fpsrate->setFontSize(16);
 
         performLayout();
     }
@@ -738,8 +820,8 @@ public:
     }
 
     virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
-        if((p.x() >= 15.0f && p.x() <= 15.0f + WINDOW_WIDTH) || 
-            (p.x() >= 515.0f && p.x() <= 515.0f + WINDOW_WIDTH)){
+        if(((p.x() >= 15.0f && p.x() <= 15.0f + WINDOW_WIDTH) || 
+            (p.x() >= 515.0f && p.x() <= 515.0f + WINDOW_WIDTH)) && (p.y() >= 15.0f && p.y() <= 15.0f + WINDOW_HEIGHT) ){
             //If the mouse is moved for the very first time
             if(firstMouse){
                 lastX = p.x();
@@ -913,6 +995,8 @@ public:
     virtual void draw(NVGcontext *ctx) {
         /* Draw the user interface */
         Screen::draw(ctx);
+        // FPS Rate
+        textBox_fpsrate->setValue("OpenGL:" + std::to_string(fpsrate_opengl) + "/Close2GL:" + std::to_string(fpsrate_close2gl));
     }
 
 private:
