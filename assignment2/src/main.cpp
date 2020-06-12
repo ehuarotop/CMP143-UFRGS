@@ -325,9 +325,6 @@ public:
         //Setting initial drawing mode to 3 -> solid polygons
         this->drawing_mode = 3;
 
-        //Setting initial culling orientation to clockwise
-        //this->culling_orientation = 1;
-
         //Reading file with the information corresponding to the cube
         custom_shader.use();
         if (model_filename != "../data/cube.in" && model_filename != "../data/cow_up.in")
@@ -454,10 +451,6 @@ public:
 
             for (int i=0; i<triangles.size(); i++){
 
-                /*triangles[i].v0 = matrix.multiply_matrix_vector(modelViewProj, triangles[i].v0);
-                triangles[i].v1 = matrix.multiply_matrix_vector(modelViewProj, triangles[i].v1);
-                triangles[i].v2 = matrix.multiply_matrix_vector(modelViewProj, triangles[i].v2);*/
-
                 triangles[i].v0 = matrix.transform_vector(triangles[i].v0, modelViewProj);
                 triangles[i].v1 = matrix.transform_vector(triangles[i].v1, modelViewProj);
                 triangles[i].v2 = matrix.transform_vector(triangles[i].v2, modelViewProj);
@@ -480,57 +473,6 @@ public:
 
             }
 
-            //cout<<clipped_triangles.size()<<endl;
-            //cout<<"------------------"<<endl;
-
-            //Performing backface culling, clearing temp_triangles.
-            /*temp.clear();
-            for(int i=0; i<clipped_triangles.size(); i++){
-
-                cout<<glm::to_string(close2gl.front)<<endl;
-
-                float dotProduct = matrix.dotProduct(close2gl.front, clipped_triangles[i].face_normal);
-
-                if(culling_orientation == 1){
-                    //clockwise
-                    if(dotProduct >= 0){
-                        temp.push_back(clipped_triangles[i]);
-                    }
-
-                    glFrontFace(GL_CW);
-                    
-                } else if (culling_orientation == 2){
-                    //counter clockwise
-                    if(dotProduct <= 0){
-                        temp.push_back(clipped_triangles[i]);
-                    }
-
-                    glFrontFace(GL_CCW);
-
-                } else {
-                    //Without back face culling
-                    temp.push_back(clipped_triangles[i]);
-                }
-            }
-
-            clipped_triangles = temp;*/
-
-            //cout<<clipped_triangles.size()<<endl;
-            //cout<<"----------------------"<<endl;
-
-            //Assigning temp triangles to clipped_triangles.
-            //clipped_triangles = temp;
-
-            /*if(culling_orientation == 1){
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-                glFrontFace(GL_CW); 
-            }else if (culling_orientation == 2){
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-                glFrontFace(GL_CCW);
-            }*/
-
             //glm::mat4 viewportMatrix = close2gl.getViewPortMatrix(0.0f, float(WINDOW_WIDTH), float(WINDOW_HEIGHT), 0.0f);
 
             //Performing perspective division over the clipped triangles and transforming them with viewport matrix
@@ -538,10 +480,6 @@ public:
                 clipped_triangles[i].v0 = clipped_triangles[i].v0 / clipped_triangles[i].v0.w;
                 clipped_triangles[i].v1 = clipped_triangles[i].v1 / clipped_triangles[i].v1.w;
                 clipped_triangles[i].v2 = clipped_triangles[i].v2 / clipped_triangles[i].v2.w;
-
-                /*clipped_triangles[i].v0 = matrix.multiply_matrix_vector(viewportMatrix, clipped_triangles[i].v0);
-                clipped_triangles[i].v1 = matrix.multiply_matrix_vector(viewportMatrix, clipped_triangles[i].v1);
-                clipped_triangles[i].v2 = matrix.multiply_matrix_vector(viewportMatrix, clipped_triangles[i].v2);*/
 
             }
 
@@ -568,15 +506,9 @@ public:
                     temp.push_back(clipped_triangles[i]);
                 }
 
-                //cout<<glm::to_string(bfvec)<<endl;
             }
 
-            //cout<<"----------------------"<<endl;
-
             clipped_triangles = temp;
-
-            //cout<<clipped_triangles.size()<<endl;
-
 
             //Getting vertices in a 1d array to pass it to the shader
             float vert[6*clipped_triangles.size()];
@@ -671,6 +603,7 @@ public:
     Window *window;
     Window *windowC2GL;
     Window *windowGUI;
+    Window *windowGUI2;
     MyTextBox *textBox_np;
     MyTextBox *textBox_fp;
     MyTextBox *textBox_fpsrate;
@@ -803,6 +736,38 @@ public:
         textBox_fpsrate->setValue("0.0f");
         textBox_fpsrate->setUnits("fps");
         textBox_fpsrate->setFontSize(16);
+
+
+        ////////////////////// Second window GUI for missing options in the first one /////////////////////////////
+        
+        //Creating window for GUI options
+        windowGUI2 = new Window(this, "Shading");
+        windowGUI2->setPosition(Vector2i(850,525));
+        windowGUI2->setLayout(new GroupLayout());
+
+        Widget *tools2 = new Widget(windowGUI2);
+        tools2->setLayout(new BoxLayout(Orientation::Vertical,
+                                       Alignment::Fill, 0, 6));
+
+        new Label(tools2, "Shading type", "sans-bold");
+
+        Button *gouraud_ad = new Button(tools2, "Gouraud AD");
+        gouraud_ad->setCallback([this](){
+            mCanvasObject->setModel("../data/cube.in");
+            mCanvasObjectC2GL->setModel("../data/cube.in");
+        });
+
+        Button *gouraud_ads = new Button(tools2, "Gouraud ADS");
+        gouraud_ads->setCallback([this](){
+            mCanvasObject->setModel("../data/cow_up.in");
+            mCanvasObjectC2GL->setModel("../data/cow_up.in");
+        });
+
+        Button *phong = new Button(tools2, "Phong");
+        phong->setCallback([this](){
+            mCanvasObject->setModel("../data/cow_up.in");
+            mCanvasObjectC2GL->setModel("../data/cow_up.in");
+        });
 
         performLayout();
     }
