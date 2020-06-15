@@ -127,51 +127,51 @@ public:
     		position -= movementSpeed_FB * front;
 
     		//Updating distance Projection Sphere
-    		distanceProjSphere = glm::length(position);
+    		distanceProjSphere = matrix.lengthv3(position);
     	}else if (movement_direction == BACKWARD){
     		position += movementSpeed_FB * front;
 
     		//Updating distance Projection Sphere
-    		distanceProjSphere = glm::length(position);
+    		distanceProjSphere = matrix.lengthv3(position);
     	}else if (movement_direction == RIGHT){
     		//Calculating update for right
-    		right = glm::normalize(glm::cross(up, front));
+    		right = matrix.normalizev3(matrix.crossProduct(up, front));
 
     		//Calculating new Camera position
     		position -=  right * movementSpeed;
 
     		//Updating front
-    		front = glm::normalize(position);
+    		front = matrix.normalizev3(position);
 
     	}else if (movement_direction == LEFT){
     		//Calculating update for camera right
-    		right = glm::normalize(glm::cross(up, front));
+    		right = matrix.normalizev3(matrix.crossProduct(up, front));
 
     		//Calculating new Camera position
     		position += right * movementSpeed;
 
     		//Updating front
-    		front = glm::normalize(position);
+    		front = matrix.normalizev3(position);
 
     	} /*else if (movement_direction == UP){
     		//Calculating update for up
-    		up = glm::normalize(glm::cross(right, front));
+    		up = matrix.normalizev3(matrix.crossProduct(right, front));
 
     		//Calculating new Camera Position
     		position -= up * movementSpeed;
 
     		//Updating camera front
-    		front = glm::normalize(position);
+    		front = matrix.normalizev3(position);
 
     	}else if (movement_direction == DOWN){
     		//Calculating update for up
-    		up = glm::normalize(glm::cross(right, front));
+    		up = matrix.normalizev3(matrix.crossProduct(right, front));
 
     		//Calculating new Camera Position
-    		position += up * movementSpeed;
+    		position -= up * movementSpeed;
 
     		//Updating camera front
-    		front = glm::normalize(position);
+    		front = matrix.normalizev3(position);
     	}*/
 	}
 

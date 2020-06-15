@@ -928,7 +928,7 @@ public:
             }
         }
 
-        if (key == GLFW_KEY_Q){
+        /*if (key == GLFW_KEY_Q){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
 
                 mCanvasObject->camera.processRotation(UP);
@@ -946,7 +946,7 @@ public:
 
                 return true;
             }
-        }
+        }*/
 
         //Implementing delete of string with backspace (set with scancode because glfw 
         //does not recognize GLFW_KEY_BACKSPACE)
