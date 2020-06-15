@@ -105,9 +105,8 @@ float g_far_plane = 3000.0f;
 int fpsrate_opengl = 0.0f;
 int fpsrate_close2gl = 0.0f;
 
-
-//Debugging
-int count_print;
+//ambient, diffuse and specular colors
+glm::vec3 g_ambient[MAX_MATERIAL_COUNT], g_diffuse[MAX_MATERIAL_COUNT], g_specular[MAX_MATERIAL_COUNT];
 
 ///////////////////////////////// CANVAS DECLARATION OPENGL /////////////////////////////////
 class MyGLCanvas : public GLCanvas{
@@ -123,22 +122,27 @@ public:
     int framesPerSecond = 0;
     float lastTime = 0.0f;
 
+    //Light
+    glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+
     MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex.glsl", "../src/shader_fragment.glsl"){
 
         //Setting initial color to white
         this->color = glm::vec4(1.0f);
+        lightColor = glm::vec3(this->color);
 
         //Setting initial drawing mode to 3 -> solid polygons
         this->drawing_mode = 3;
-
-        //Setting initial culling orientation to clockwise
-        //this->culling_orientation = 1;
 
         //Reading file with the information corresponding to the cube
         custom_shader.use();
         if (model_filename != "../data/cube.in" && model_filename != "../data/cow_up.in")
             model_used = 0;
+    }
 
+    void setShading(int shading_type){
+        this->shading_type = shading_type;
     }
 
     void setModel(const char* filename){
@@ -249,17 +253,49 @@ public:
                                             ((float)this->width())/this->height(),
                                             g_near_plane, g_far_plane);
 
+            //Updating light location with camera movement
+            lightPos = glm::vec3(0.0f, 0.0f, distanceProjSphere + 100.0f);
+
             // retrieve the matrix uniform locations
             unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
             unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
             unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
-            unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
+            unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "objectColor");
+            unsigned int lightPosLoc = glGetUniformLocation(custom_shader.ID, "lightPos");
+            unsigned int lightColorLoc = glGetUniformLocation(custom_shader.ID, "lightColor");
+            unsigned int viewPosLoc = glGetUniformLocation(custom_shader.ID, "viewPos");
+            unsigned int shadingTypeLoc = glGetUniformLocation(custom_shader.ID, "shading_type");
 
             // pass them to the shaders (3 different ways)
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
             glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
             glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
+            glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPos));
+            glUniform3fv(lightColorLoc, 1, glm::value_ptr(glm::vec3(this->color)));
+            glUniform3fv(viewPosLoc, 1, glm::value_ptr(camera.cameraPos));
+
+            switch(this->shading_type){
+                case 0:
+                    //no shading
+                    glUniform1i(shadingTypeLoc, 0);
+                    break;
+                case 1:
+                    //gouraud AD
+                    glUniform1i(shadingTypeLoc, 1);
+                    break;
+                case 2:
+                    //gouraud ADS
+                    glUniform1i(shadingTypeLoc, 2);
+                    break;
+                case 3:
+                    glUniform1i(shadingTypeLoc, 3);
+                    //phong
+                    break;
+                default:
+                    glUniform1i(shadingTypeLoc, 0);
+                    break;
+            }
 
             glBindVertexArray(VAO);
 
@@ -286,12 +322,15 @@ public:
                 glDrawArrays(GL_TRIANGLES, 0, g_num_triangles*3);
             
             glDisable(GL_DEPTH_TEST);
+
         }
     }
 
 private:
     unsigned int VAO;
+    int shading_type;
     CustomShader custom_shader;
+    //CustomShader light_shader;
     const char* model_filename;
     glm::vec4 color;
     unsigned int drawing_mode;
@@ -379,6 +418,10 @@ public:
         close2gl.setModel(model_used);
 
         firstMouse = true;
+    }
+
+    void setShading(int shading_type){
+        this->shading_type = shading_type;
     }
 
     void setColor(glm::vec4 choosen_color){
@@ -569,6 +612,7 @@ public:
 
 private:
     unsigned int VAO;
+    int shading_type;
     CustomShader custom_shader;
     const char* model_filename;
     glm::vec4 color;
@@ -749,24 +793,28 @@ public:
         tools2->setLayout(new BoxLayout(Orientation::Vertical,
                                        Alignment::Fill, 0, 6));
 
-        new Label(tools2, "Shading type", "sans-bold");
+        Button *normal_shading = new Button(tools2, "Normal");
+        normal_shading->setCallback([this](){
+            mCanvasObject->setShading(0);
+            mCanvasObjectC2GL->setShading(0);
+        });
 
         Button *gouraud_ad = new Button(tools2, "Gouraud AD");
         gouraud_ad->setCallback([this](){
-            mCanvasObject->setModel("../data/cube.in");
-            mCanvasObjectC2GL->setModel("../data/cube.in");
+            mCanvasObject->setShading(1);
+            mCanvasObjectC2GL->setShading(1);
         });
 
         Button *gouraud_ads = new Button(tools2, "Gouraud ADS");
         gouraud_ads->setCallback([this](){
-            mCanvasObject->setModel("../data/cow_up.in");
-            mCanvasObjectC2GL->setModel("../data/cow_up.in");
+            mCanvasObject->setShading(2);
+            mCanvasObjectC2GL->setShading(2);
         });
 
         Button *phong = new Button(tools2, "Phong");
         phong->setCallback([this](){
-            mCanvasObject->setModel("../data/cow_up.in");
-            mCanvasObjectC2GL->setModel("../data/cow_up.in");
+            mCanvasObject->setShading(3);
+            mCanvasObjectC2GL->setShading(3);
         });
 
         performLayout();
@@ -974,9 +1022,9 @@ unsigned int readFile(const char* filename){
     char ch;
     int num_triangles, material_count, i, color_index[3];
 
-    glm::vec3 ambient[MAX_MATERIAL_COUNT], 
+    /*glm::vec3 ambient[MAX_MATERIAL_COUNT], 
                 diffuse[MAX_MATERIAL_COUNT], 
-                specular[MAX_MATERIAL_COUNT];
+                specular[MAX_MATERIAL_COUNT];*/
 
     float shine[MAX_MATERIAL_COUNT];
 
@@ -995,9 +1043,9 @@ unsigned int readFile(const char* filename){
     fscanf(fp,"Material count = %d\n", &material_count);
 
     for (i=0; i<material_count; i++) {
-        fscanf(fp, "ambient color %f %f %f\n", &(ambient[i].x), &(ambient[i].y), &(ambient[i].z));
-        fscanf(fp, "diffuse color %f %f %f\n", &(diffuse[i].x), &(diffuse[i].y), &(diffuse[i].z));
-        fscanf(fp, "specular color %f %f %f\n", &(specular[i].x), &(specular[i].y), &(specular[i].z));
+        fscanf(fp, "ambient color %f %f %f\n", &(g_ambient[i].x), &(g_ambient[i].y), &(g_ambient[i].z));
+        fscanf(fp, "diffuse color %f %f %f\n", &(g_diffuse[i].x), &(g_diffuse[i].y), &(g_diffuse[i].z));
+        fscanf(fp, "specular color %f %f %f\n", &(g_specular[i].x), &(g_specular[i].y), &(g_specular[i].z));
         fscanf(fp, "material shine %f\n", &(shine[i]));
     }
 
@@ -1027,14 +1075,15 @@ unsigned int readFile(const char* filename){
         
         fscanf(fp, "v2 %f %f %f %f %f %f %d\n",
                 &(Tris[i].v2.x), &(Tris[i].v2.y), &(Tris[i].v2.z),
-                &(Tris[i].normal[2].x), &(Tris[i].normal[2].y), &(Tris[i].normal[2].z),&(color_index[2]));
+                &(Tris[i].normal[2].x), &(Tris[i].normal[2].y), &(Tris[i].normal[2].z),
+                &(color_index[2]));
         
         fscanf(fp, "face normal %f %f %f\n", &(Tris[i].face_normal.x), &(Tris[i].face_normal.y),
                 &(Tris[i].face_normal.z));
         
-        Tris[i].Color[0] = (unsigned char)(int)(255*(diffuse[color_index[0]].x));
-        Tris[i].Color[1] = (unsigned char)(int)(255*(diffuse[color_index[1]].y));
-        Tris[i].Color[2] = (unsigned char)(int)(255*(diffuse[color_index[2]].z));
+        Tris[i].Color[0] = (unsigned char)(int)(255*(g_diffuse[color_index[0]].x));
+        Tris[i].Color[1] = (unsigned char)(int)(255*(g_diffuse[color_index[1]].y));
+        Tris[i].Color[2] = (unsigned char)(int)(255*(g_diffuse[color_index[2]].z));
 
         //Getting min and max for X axis
         if(Tris[i].v0.x < g_min_X){
@@ -1136,7 +1185,7 @@ unsigned int readFile(const char* filename){
     }
 
     //Defining VAO
-    unsigned int VBO, VBO_color, VAO;
+    unsigned int VBO, VBO_normal, VAO;
     glGenVertexArrays(1, &VAO);
     
     // binding the Vertex Array Object.
@@ -1152,6 +1201,17 @@ unsigned int readFile(const char* filename){
     //Setting 0 in position (according to the specification on the shader)
     glEnableVertexAttribArray(0);
 
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    /////////////  Binding buffer for vertex normal VBO //////////////////////
+    glGenBuffers(1, &VBO_normal);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_normal);
+    glBufferData(GL_ARRAY_BUFFER, num_triangles*9*sizeof(GL_FLOAT), vert_normal, GL_STATIC_DRAW);
+    //Position, # dimensions, data type, ##, 0, 0
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    //Setting 1 in position (according to the specification on the shader)
+    glEnableVertexAttribArray(1);
+
     //Unbinding the VBO buffer
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -1166,9 +1226,9 @@ vector<Triangle_c2gl> readFile_close2gl(const char* filename){
     char ch;
     int num_triangles, material_count, i, color_index[3];
 
-    glm::vec3 ambient[MAX_MATERIAL_COUNT], 
+    /*glm::vec3 ambient[MAX_MATERIAL_COUNT], 
                 diffuse[MAX_MATERIAL_COUNT], 
-                specular[MAX_MATERIAL_COUNT];
+                specular[MAX_MATERIAL_COUNT];*/
 
     float shine[MAX_MATERIAL_COUNT];
 
@@ -1187,9 +1247,9 @@ vector<Triangle_c2gl> readFile_close2gl(const char* filename){
     fscanf(fp,"Material count = %d\n", &material_count);
 
     for (i=0; i<material_count; i++) {
-        fscanf(fp, "ambient color %f %f %f\n", &(ambient[i].x), &(ambient[i].y), &(ambient[i].z));
-        fscanf(fp, "diffuse color %f %f %f\n", &(diffuse[i].x), &(diffuse[i].y), &(diffuse[i].z));
-        fscanf(fp, "specular color %f %f %f\n", &(specular[i].x), &(specular[i].y), &(specular[i].z));
+        fscanf(fp, "ambient color %f %f %f\n", &(g_ambient[i].x), &(g_ambient[i].y), &(g_ambient[i].z));
+        fscanf(fp, "diffuse color %f %f %f\n", &(g_diffuse[i].x), &(g_diffuse[i].y), &(g_diffuse[i].z));
+        fscanf(fp, "specular color %f %f %f\n", &(g_specular[i].x), &(g_specular[i].y), &(g_specular[i].z));
         fscanf(fp, "material shine %f\n", &(shine[i]));
     }
 
@@ -1219,7 +1279,8 @@ vector<Triangle_c2gl> readFile_close2gl(const char* filename){
         
         fscanf(fp, "v2 %f %f %f %f %f %f %d\n",
                 &(Tris[i].v2.x), &(Tris[i].v2.y), &(Tris[i].v2.z),
-                &(Tris[i].normal[2].x), &(Tris[i].normal[2].y), &(Tris[i].normal[2].z),&(color_index[2]));
+                &(Tris[i].normal[2].x), &(Tris[i].normal[2].y), &(Tris[i].normal[2].z),
+                &(color_index[2]));
         
         fscanf(fp, "face normal %f %f %f\n", &(Tris[i].face_normal.x), &(Tris[i].face_normal.y),
                 &(Tris[i].face_normal.z));
@@ -1229,9 +1290,9 @@ vector<Triangle_c2gl> readFile_close2gl(const char* filename){
         Tris[i].v1.w = 1.0f;
         Tris[i].v2.w = 1.0f;
         
-        Tris[i].Color[0] = (unsigned char)(int)(255*(diffuse[color_index[0]].x));
-        Tris[i].Color[1] = (unsigned char)(int)(255*(diffuse[color_index[1]].y));
-        Tris[i].Color[2] = (unsigned char)(int)(255*(diffuse[color_index[2]].z));
+        Tris[i].Color[0] = (unsigned char)(int)(255*(g_diffuse[color_index[0]].x));
+        Tris[i].Color[1] = (unsigned char)(int)(255*(g_diffuse[color_index[1]].y));
+        Tris[i].Color[2] = (unsigned char)(int)(255*(g_diffuse[color_index[2]].z));
 
         //Getting min and max for X axis
         if(Tris[i].v0.x < g_min_X){

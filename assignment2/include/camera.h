@@ -106,7 +106,7 @@ public:
     		//Updating cameraFront
     		cameraFront = glm::normalize(-cameraPos);
 
-    	}else if (movement_direction == UP){
+    	}/*else if (movement_direction == UP){
     		//Calculating update for cameraUp
     		cameraUp = glm::normalize(-glm::cross(cameraFront, cameraRight));
 
@@ -125,7 +125,7 @@ public:
 
     		//Updating camera front
     		cameraFront = glm::normalize(-cameraPos);
-    	}
+    	}*/
     }
 
     // Returns the view matrix calculated using Euler Angles and the LookAt Matrix
