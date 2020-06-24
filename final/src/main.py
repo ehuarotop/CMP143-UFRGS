@@ -10,7 +10,7 @@ from array import array
 import numpy as np
 
 window = 0 
-width, height = 500,400
+width, height = 1024,768
 
 def draw():
     GL.glClear(GL.GL_COLOR_BUFFER_BIT |GL.GL_DEPTH_BUFFER_BIT)           
@@ -23,12 +23,13 @@ def main():
     GLUT.GLUT_DEPTH)
     GLUT.glutInitWindowSize(width,height)
     GLUT.glutInitWindowPosition(0,0)
-    window = GLUT.glutCreateWindow(b"noobtute")
+    window = GLUT.glutCreateWindow("CMP143 - Final Project - Felix Eduardo Huaroto Pachas")
     GLUT.glutDisplayFunc(draw)                                                                       
     GLUT.glutIdleFunc(draw)  
     GLUT.glutMainLoop()
 
-if __name__ == __
+if __name__ == "__main__":
+    main()
 
 
 #from framework import *
