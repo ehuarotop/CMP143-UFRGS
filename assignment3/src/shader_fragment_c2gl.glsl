@@ -6,5 +6,5 @@ out vec4 FragColor;
 in vec2 TexCoord;
 
 void main(){
-	FragColor = texture(texture1, TexCoord);
+	FragColor = texture(texture1, TexCoord)*rasterizer_color;
 }

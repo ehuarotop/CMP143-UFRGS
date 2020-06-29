@@ -587,10 +587,12 @@ public:
 
             // select pair of active edges as V1V2 (1) and V1V3 (2).
             dx1 = V2.x - V1.x;
-            dy1 = V1.y - V2.y;
+            //dy1 = V1.y - V2.y;
+            dy1 = V2.y - V1.y;
 
             dx2 = V3.x - V1.x;
-            dy2 = V1.y - V3.y;
+            //dy2 = V1.y - V3.y;
+            dy2 = V3.y - V1.y;
 
             height_r = dy1; // doesn't matter which since V2.y = V3.y
             incx1 = dx1 / dy1;
@@ -712,10 +714,12 @@ public:
 
             // select pair of active edges as V1V2 (1) and V1V3 (2).
             dx1 = V2.x - V1.x;
-            dy1 = V1.y - V2.y;
+            //dy1 = V1.y - V2.y;
+            dy1 = V2.y - V1.y;
 
             dx2 = V3.x - V1.x;
-            dy2 = V1.y - V3.y;
+            //dy2 = V1.y - V3.y;
+            dy2 = V3.y - V1.y;
 
             incx1 = dx1 / dy1;
             incx2 = dx2 / dy2;
@@ -970,8 +974,6 @@ public:
 
             clipped_triangles = temp;
 
-            //cout<<clipped_triangles.size()<<endl;
-
             /********************** UNTIL HERE ASSIGNMENT2 ENDS *******************************/
 
             /********************** HERE BEGINS ASSIGNMENT 3 **********************************/
@@ -986,16 +988,6 @@ public:
 
                 rasterize_triangle(clipped_triangles[i]);
             }
-
-
-            //cout<<"*****************************************"<<endl;
-
-            //Creating vertex and coordinates data to render two triangles and apply texture
-            /*float vertex_data[12] = {-1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 
-                                 1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f};
-
-            float texture_coords[12] = {0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-                                    1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f};*/
 
             // vertex_data containing information about vertex and texture
             float vertex_data[24] = {-1.0f, -1.0f, 0.0f, 0.0f, 
