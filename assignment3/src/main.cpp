@@ -71,7 +71,8 @@ struct Triangle {
 struct Triangle_c2gl {
     glm::vec4 v0, v1, v2;
     glm::vec3 face_normal, normal[3];
-    float Color[3];  
+    glm::vec3 colorv0, colorv1, colorv2;
+    //float Color[3];
 };
 
 ///////////////////////// FUNCTION DECLARATION /////////////////////////
@@ -356,6 +357,16 @@ public:
     int framesPerSecond = 0;
     float lastTime = 0.0f;
 
+
+    //Variables for rasterization
+
+    struct RGBA_color{
+        float r,g,b,a;
+    };
+
+    double *z_buffer;  //depth buffer
+    RGBA_color *color_buffer; //color buffer
+
     MyGLCanvasC2GL(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex_c2gl.glsl", "../src/shader_fragment_c2gl.glsl"){
 
         //Setting initial color to white
@@ -417,6 +428,8 @@ public:
         //camera.setModel(model_used);
         close2gl.setModel(model_used);
 
+        allocate_buffers();
+
         firstMouse = true;
     }
 
@@ -435,6 +448,416 @@ public:
     void setCullingOrientation(unsigned int culling_orientation){
         this->culling_orientation = culling_orientation;
     }
+
+    /****************** Rasterization methods **********************/
+    void clear_buffers(){
+        for (int i = 0; i < WINDOW_WIDTH*WINDOW_HEIGHT; i++) {
+            z_buffer[i] = INT_MAX - 1;
+            color_buffer[i] = { 0, 0, 0, 1 };
+        }
+    }
+
+    void allocate_buffers(){
+
+        //free(color_buffer);
+        //free(z_buffer);
+        
+        color_buffer = (RGBA_color*) calloc(WINDOW_WIDTH*WINDOW_HEIGHT,sizeof(RGBA_color));
+        
+        z_buffer = (double*) calloc(WINDOW_WIDTH*WINDOW_HEIGHT, sizeof(double));
+    }
+
+    bool test_z_buffer(int x, int y, float z){
+        if (z_buffer[x + y*WINDOW_WIDTH] > z) {
+            z_buffer[x + y*WINDOW_WIDTH] = z;
+            return true;
+        }
+        else
+            return false;
+    }
+
+    void set_to_color_buffer(int x, int y, RGBA_color color){
+        color_buffer[x + y*WINDOW_WIDTH] = color;
+    }
+
+    RGBA_color interpolate_colors(glm::vec3 c1, glm::vec3 c2, float position){
+        return {position*c1.x + (1-position)*c2.x,
+                position*c1.y + (1 - position)*c2.y,
+                position*c1.z + (1 - position)*c2.z,
+                1};
+    }
+
+    RGBA_color interpolate_colors(RGBA_color c1, RGBA_color c2, float position){
+        return {position*c1.r + (1 - position)*c2.r,
+                position*c1.g + (1 - position)*c2.g,
+                position*c1.b + (1 - position)*c2.b,
+                1};
+    }
+
+    RGBA_color average_color(glm::vec3 c1, glm::vec3 c2, glm::vec3 c3) {
+        return {(c1.x + c2.x + c3.x)/3,
+                (c1.y + c2.y + c3.y)/3,
+                (c1.z + c2.z + c3.z)/3,
+                1};
+    }
+
+    RGBA_color average_color(RGBA_color c1, RGBA_color c2, RGBA_color c3)
+    {
+        return  {(c1.r + c2.r + c3.r)/3,
+                 (c1.g + c2.g + c3.g)/3,
+                 (c1.b + c2.b + c3.b)/3, 
+                 1};
+    }
+
+    float interpolate_depths(float z1, float z2, float position){
+        return (1-position)*z1 + position*z2;
+    }
+
+    void rasterize_triangle(Triangle_c2gl t){
+        glm::vec4 V1, V2, V3, left, right, bottom;
+        bool inverted_triangle = false, upright_triangle = false;
+        glm::vec3 bottomcolor, leftcolor, rightcolor;
+
+        //temp and helper variables to be used while perform triangle rasterization
+        double dx1, dx2, dx3, dy1, dy2, dy3;
+        double incx1, incx2, incz1, incz2;
+        double height_r, y;
+        double limit_left, limit_right;
+        float depth1, depth2, depth12;
+        RGBA_color color1, color2, color12;
+
+        //Getting the firs vertex (from top to bottom)
+        if(t.v0.y >= t.v1.y && t.v0.y >= t.v2.y){
+            V1 = t.v0;
+
+            //Getting second and third vertex (from top to bottom)
+            if(t.v1.y > t.v2.y){
+                V2 = t.v1; V3 = t.v2;
+            } else {
+                V2 = t.v2; V3 = t.v1;
+            }
+
+        } else if (t.v1.y >= t.v0.y && t.v1.y >= t.v2.y){
+            V1 = t.v1;
+
+            //Getting second and third vertex (from top to bottom)
+            if(t.v0.y > t.v2.y){
+                V2 = t.v0; V3 = t.v2;
+            } else {
+                V3 = t.v2; V3 = t.v0;
+            }
+
+        } else if (t.v2.y >= t.v0.y && t.v2.y >= t.v1.y){
+            V1 = t.v2;
+
+            //Getting second and third vertex (from top to bottom)
+            if(t.v0.y > t.v1.y){
+                V2 = t.v0; V3 = t.v1;
+            } else {
+                V2 = t.v1; V3 = t.v0;
+            }
+        }
+
+        //Detecting if triangle is inverted or upright
+        if(round(V1.y) == round(V2.y) || round(V1.y) == round(V3.y)){
+            inverted_triangle = true;
+        } else if (round(V2.y) == round(V3.y)){
+            upright_triangle = true;
+        }
+
+        //If is upright triangle
+        if(upright_triangle){
+
+            if(test_z_buffer(V1.x, V1.y, (float)V1.z)){
+                RGBA_color V1_color;
+                V1_color.r = t.colorv0[0];
+                V1_color.g = t.colorv0[1];
+                V1_color.b = t.colorv0[2];
+                V1_color.a = 1;
+
+                set_to_color_buffer(V1.x, V1.y, V1_color);
+            }
+
+            // select pair of active edges as V1V2 (1) and V1V3 (2).
+            dx1 = V2.x - V1.x;
+            dy1 = V1.y - V2.y;
+
+            dx2 = V3.x - V1.x;
+            dy2 = V1.y - V3.y;
+
+            height_r = dy1; // doesn't matter which since V2.y = V3.y
+            incx1 = dx1 / dy1;
+            incx2 = dx2 / dy2;
+
+            y = V1.y;
+
+            //Performing actual rasterization incrementing y one at a time.
+            for(float n=1; n <= height_r; n+=0.5f){
+                limit_left = V1.x + n*incx1;
+                limit_right = V1.x + n*incx2;
+
+                // calculate colors and depths at the right/left limits (along the edges): 
+                color1 = interpolate_colors(t.colorv1, t.colorv0, (float)(n / height_r));
+                color2 = interpolate_colors(t.colorv2, t.colorv0, (float)(n / height_r));
+
+                depth1 = interpolate_depths(V2.z, V1.z, (float)(n / height_r));
+                depth2 = interpolate_depths(V3.z, V1.z, (float)(n / height_r));
+
+                for(int x = limit_left; x<=limit_right; x++){
+                    int posx = (int)round(x);
+                    int posy = (int)round(y);
+
+                    // interpolate colors and depth between the lines set by V1V2 and V1V3
+                    color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
+                    depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+
+                    if (test_z_buffer(posx, posy, depth12)){
+                        cout<<"entre_Aqi"<<endl;
+                        // z buffer test came back positive. pixel is visible.
+                        /*if (g_Shading == 1)
+                            set_to_color_buffer(posx, posy, color12);
+                        else
+                            set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
+
+                        set_to_color_buffer(posx,posy, color12);
+                    }
+                }
+
+                y -= 0.5;
+
+            }
+
+        } else if (inverted_triangle){
+            // put first vertex in the color/z buffer.
+            if (test_z_buffer(V2.x, V2.y, (float)V2.z)) {
+                RGBA_color V2color;
+                V2color.r = t.colorv1[0];
+                V2color.g = t.colorv1[1];
+                V2color.b = t.colorv1[2];
+                V2color.a = 1;
+                set_to_color_buffer(V2.x, V2.y, V2color);
+            }
+
+            // select pair of active edges as V2V1 (1) and V2V3 (2).
+            dx1 = V2.x - V1.x;
+            dy1 = V2.y - V1.y;
+
+            dx2 = V2.x - V3.x;
+            dy2 = V2.y - V3.y;
+
+            height_r = -dy1; // doesn't matter which since V1.y = V3.y
+            incx1 = dx1 / dy1;
+            incx2 = dx2 / dy2;
+
+            y = V2.y;
+
+            for(float n=1; n <= height_r; n+=0.5f){
+                if(V1.x <= V3.x){
+                    limit_left = V2.x + n * incx1;
+                    limit_right = V2.x + n * incx2;
+                } else {
+                    limit_left = V2.x + n * incx2;
+                    limit_right = V2.x + n * incx1;
+                }
+
+                // calculate colors and depths at the right/left limits (along the edges): 
+                color1 = interpolate_colors(t.colorv0, t.colorv1, (float)(n / height_r));
+                color2 = interpolate_colors(t.colorv2, t.colorv1, (float)(n / height_r));
+
+                depth1 = interpolate_depths(V1.z, V2.z, (float)(n / height_r));
+                depth2 = interpolate_depths(V3.z, V2.z, (float)(n / height_r));
+
+                for(int x=limit_left; x<=limit_right; x++){
+                    int posx = (int)round(x);
+                    int posy = (int)round(y);
+
+                    // interpolate colors and depth between the lines set by V1V2 and V1V3
+                    color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
+                    depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+
+                    if (test_z_buffer(posx, posy, depth12)){
+                        // z buffer test came back positive. pixel is visible.
+                        /*if (g_Shading == 1)
+                            set_to_color_buffer(posx, posy, color12);
+                        else
+                            set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
+
+                        set_to_color_buffer(posx, posy, color12);
+                    }
+                }
+
+                y += 0.5f;
+
+            }
+
+        } else{ //most generic case
+
+            if(test_z_buffer(V1.x, V1.y, (float)V1.z)){
+                RGBA_color V1_color;
+                V1_color.r = t.colorv0[0];
+                V1_color.g = t.colorv0[1];
+                V1_color.b = t.colorv0[2];
+                V1_color.a = 1;
+
+                set_to_color_buffer(V1.x, V1.y, V1_color);
+            }
+
+            // select pair of active edges as V1V2 (1) and V1V3 (2).
+            dx1 = V2.x - V1.x;
+            dy1 = V1.y - V2.y;
+
+            dx2 = V3.x - V1.x;
+            dy2 = V1.y - V3.y;
+
+            incx1 = dx1 / dy1;
+            incx2 = dx2 / dy2;
+
+            //V2 is always lower than V3.
+            height_r = dy2;
+
+            y = V1.y;
+
+            for (float n = 1; n <= height_r; n += 0.5f){
+
+                if (V2.x <= V3.x){
+
+                    limit_left = V1.x + n * incx1;
+                    limit_right = V1.x + n * incx2;
+                } else {
+                    
+                    limit_left = V1.x + n * incx2;
+                    limit_right = V1.x + n * incx1;
+                }
+
+                // calculate colors and depths at the right/left limits (along the edges): 
+                color1 = interpolate_colors(t.colorv1, t.colorv0, (float)(n / height_r));
+                color2 = interpolate_colors(t.colorv2, t.colorv1, (float)(n / height_r));
+
+                depth1 = interpolate_depths(V2.z, V1.z, (float)(n / height_r));
+                depth2 = interpolate_depths(V3.z, V1.z, (float)(n / height_r));
+
+                for (int x = limit_left; x <= limit_right; x++) {
+                    int posx = (int)round(x);
+                    int posy = (int)round(y);
+
+                    // interpolate colors and depth between the lines set by V1V2 and V1V3
+                    color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
+                    depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+
+                    if (test_z_buffer(posx, posy, depth12)) {
+                        // z buffer test came back positive. pixel is visible.
+                        /*if (g_Shading == 1)
+                            set_to_color_buffer(posx, posy, color12);
+                        else
+                            set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
+
+                        set_to_color_buffer(posx, posy, color12);
+                    }
+
+                }
+
+                y -= 0.5;
+            }
+
+            // Second part of implementation of the most generic case
+
+            // V2 is always the bottom vertex.
+            bottom = V2; bottomcolor = t.colorv1;
+            if (V1.x >= V3.x){ 
+                left = V3;
+                leftcolor = t.colorv2;
+                right = V1;
+                rightcolor = t.colorv0;
+            } else { 
+                left = V1;
+                leftcolor = t.colorv0;
+                right = V3;
+                rightcolor = t.colorv2;
+            }
+
+            height_r = V3.y - V2.y;
+
+            // put first vertex in the color/z buffer.
+            if (test_z_buffer(bottom.x, bottom.y, (float)bottom.z))
+            {
+                RGBA_color V2color;
+                V2color.r = bottomcolor[0];
+                V2color.g = bottomcolor[1];
+                V2color.b = bottomcolor[2];
+                V2color.a = 1;
+                set_to_color_buffer(bottom.x, bottom.y, V2color);
+            }
+
+            // select pair of active edges as V2V1 (1) and V2V3 (2).
+            dx1 = bottom.x - left.x;
+            dy1 = bottom.y - left.y;
+
+            dx2 = bottom.x - right.x;
+            dy2 = bottom.y - right.y;
+
+            incx1 = dx1 / dy1;
+            incx2 = dx2 / dy2;
+
+            y = bottom.y;
+
+            // incrementing y one at a time, rasterize each line.
+            for (float n = 1; n <= height_r; n += 0.5)
+            {
+                limit_left = bottom.x + n * incx1;
+                limit_right = bottom.x + n * incx2;
+
+
+                // calculate colors and depths at the right/left limits (along the edges): 
+                color1 = interpolate_colors(leftcolor, bottomcolor, (float)(n / height_r));
+                color2 = interpolate_colors(rightcolor, bottomcolor, (float)(n / height_r));
+
+                depth1 = interpolate_depths(left.z, bottom.z, (float)(n / height_r));
+                depth2 = interpolate_depths(right.z, bottom.z, (float)(n / height_r));
+
+                for (int x = limit_left; x <= limit_right; x++)
+                {
+                    int posx = (int)round(x);
+                    int posy = (int)round(y);
+
+                    // interpolate colors and depth between the lines set by V1V2 and V1V3
+                    color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
+                    depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+
+                    if (test_z_buffer(posx, posy, depth12))
+                    {
+                        // z buffer test came back positive. pixel is visible.
+                        /*if (g_Shading == 1)
+                            set_to_color_buffer(posx, posy, color12);
+                        else
+                            set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
+
+                        set_to_color_buffer(posx, posy, average_color(t.colorv0, t.colorv1, t.colorv2));
+                    }
+
+                }
+                y += 0.5;
+            }
+
+        }
+
+        for(int i=0; i<=100; i++){
+            cout<<color_buffer[i].r<<endl;
+            cout<<color_buffer[i].g<<endl;
+            cout<<color_buffer[i].b<<endl;
+            cout<<color_buffer[i].a<<endl;
+            cout<<"*****************"<<endl;
+        }
+
+        cout<<"--------------------------------------"<<endl;
+
+        /*cout<<glm::to_string(V1)<<endl;
+        cout<<glm::to_string(V2)<<endl;
+        cout<<glm::to_string(V3)<<endl;
+        cout<<"-----------------------------------"<<endl;*/
+
+    }
+
+    /****************** End of Rasterization methods **********************/
 
     virtual void drawGL() override {
 
@@ -503,7 +926,8 @@ public:
             //Clearing clipped_triangles
             clipped_triangles.clear();
 
-            //Clipping (considering) only triangles inside the perspective volume
+            /******* CLIPPING ********/
+            //(considering) only triangles inside the perspective volume
             for(int i=0; i<triangles.size(); i++){
                 //Getting w position of each vertex
                 float w0 = abs(triangles[i].v0.w);
@@ -516,8 +940,6 @@ public:
 
             }
 
-            //glm::mat4 viewportMatrix = close2gl.getViewPortMatrix(0.0f, float(WINDOW_WIDTH), float(WINDOW_HEIGHT), 0.0f);
-
             //Performing perspective division over the clipped triangles and transforming them with viewport matrix
             for(int i=0; i<clipped_triangles.size(); i++){
                 clipped_triangles[i].v0 = clipped_triangles[i].v0 / clipped_triangles[i].v0.w;
@@ -527,7 +949,7 @@ public:
             }
 
 
-            //Performing backface culling
+            /****************** PERFORMING BACKFACE CULLING ******************/
             temp.clear();
             for(int i=0; i<clipped_triangles.size(); i++){
                 glm::vec3 vecBA = clipped_triangles[i].v1 - clipped_triangles[i].v0;
@@ -553,8 +975,38 @@ public:
 
             clipped_triangles = temp;
 
+            cout<<clipped_triangles.size()<<endl;
+
+            /********************** UNTIL HERE ASSIGNMENT2 ENDS *******************************/
+
+            /********************** HERE BEGINS ASSIGNMENT 3 **********************************/
+
+            //Performing viewport transformation
+            glm::mat4 viewportMatrix = close2gl.getViewPortMatrix(0.0f, float(WINDOW_WIDTH), float(WINDOW_HEIGHT), 0.0f);
+
+            for(int i=0; i<clipped_triangles.size(); i++){
+                clipped_triangles[i].v0 = matrix.transform_vector(clipped_triangles[i].v0, viewportMatrix);
+                clipped_triangles[i].v1 = matrix.transform_vector(clipped_triangles[i].v1, viewportMatrix);
+                clipped_triangles[i].v2 = matrix.transform_vector(clipped_triangles[i].v2, viewportMatrix);
+
+                rasterize_triangle(clipped_triangles[i]);
+            }
+
+            // Drawing color buffer
+            glDrawPixels(WINDOW_WIDTH, WINDOW_HEIGHT, GL_RGBA, GL_FLOAT, color_buffer);
+
+            //glfwSwapBuffers(this);
+
+
+
+            /*cout<<glm::to_string(clipped_triangles[0].v0)<<endl;
+            cout<<glm::to_string(clipped_triangles[0].v1)<<endl;
+            cout<<glm::to_string(clipped_triangles[0].v2)<<endl;*/
+
+            /********************** HERE ENDS ASSIGNMENT 3 **********************************/            
+
             //Getting vertices in a 1d array to pass it to the shader
-            float vert[6*clipped_triangles.size()];
+            /*float vert[6*clipped_triangles.size()];
 
             for(int i=0; i < clipped_triangles.size(); i++){
                 vert[6*i]   = clipped_triangles[i].v0.x;
@@ -605,7 +1057,7 @@ public:
             unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
 
             // pass matrix uniform locations to the shaders
-            glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
+            glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));*/
 
         }
     }
@@ -1290,9 +1742,21 @@ vector<Triangle_c2gl> readFile_close2gl(const char* filename){
         Tris[i].v1.w = 1.0f;
         Tris[i].v2.w = 1.0f;
         
-        Tris[i].Color[0] = (unsigned char)(int)(255*(g_diffuse[color_index[0]].x));
+        /*Tris[i].Color[0] = (unsigned char)(int)(255*(g_diffuse[color_index[0]].x));
         Tris[i].Color[1] = (unsigned char)(int)(255*(g_diffuse[color_index[1]].y));
-        Tris[i].Color[2] = (unsigned char)(int)(255*(g_diffuse[color_index[2]].z));
+        Tris[i].Color[2] = (unsigned char)(int)(255*(g_diffuse[color_index[2]].z));*/
+
+        Tris[i].colorv0.x = (unsigned char)(int)(255*(g_diffuse[color_index[0]].x));
+        Tris[i].colorv0.y = (unsigned char)(int)(255*(g_diffuse[color_index[0]].y));
+        Tris[i].colorv0.z = (unsigned char)(int)(255*(g_diffuse[color_index[0]].z));
+
+        Tris[i].colorv1.x = (unsigned char)(int)(255*(g_diffuse[color_index[1]].x));
+        Tris[i].colorv1.y = (unsigned char)(int)(255*(g_diffuse[color_index[1]].y));
+        Tris[i].colorv1.z = (unsigned char)(int)(255*(g_diffuse[color_index[1]].z));
+
+        Tris[i].colorv2.x = (unsigned char)(int)(255*(g_diffuse[color_index[2]].x));
+        Tris[i].colorv2.y = (unsigned char)(int)(255*(g_diffuse[color_index[2]].y));
+        Tris[i].colorv2.z = (unsigned char)(int)(255*(g_diffuse[color_index[2]].z));
 
         //Getting min and max for X axis
         if(Tris[i].v0.x < g_min_X){
