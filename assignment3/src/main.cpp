@@ -366,6 +366,7 @@ public:
 
     double *z_buffer;  //depth buffer
     RGBA_color *color_buffer; //color buffer
+    RGBA_color *color_buffer2;
 
     MyGLCanvasC2GL(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex_c2gl.glsl", "../src/shader_fragment_c2gl.glsl"){
 
@@ -379,6 +380,8 @@ public:
         custom_shader.use();
         if (model_filename != "../data/cube.in" && model_filename != "../data/cow_up.in")
             model_used = 0;
+
+        allocate_buffers();
 
     }
 
@@ -427,8 +430,6 @@ public:
 
         //camera.setModel(model_used);
         close2gl.setModel(model_used);
-
-        allocate_buffers();
 
         firstMouse = true;
     }
@@ -516,7 +517,7 @@ public:
     void rasterize_triangle(Triangle_c2gl t){
         glm::vec4 V1, V2, V3, left, right, bottom;
         bool inverted_triangle = false, upright_triangle = false;
-        glm::vec3 bottomcolor, leftcolor, rightcolor;
+        glm::vec3 bottomcolor, leftcolor, rightcolor, v1color, v2color, v3color;
 
         //temp and helper variables to be used while perform triangle rasterization
         double dx1, dx2, dx3, dy1, dy2, dy3;
@@ -528,37 +529,43 @@ public:
 
         //Getting the firs vertex (from top to bottom)
         if(t.v0.y >= t.v1.y && t.v0.y >= t.v2.y){
-            V1 = t.v0;
+            V1 = t.v0; v1color = t.colorv0;
 
             //Getting second and third vertex (from top to bottom)
             if(t.v1.y > t.v2.y){
-                V2 = t.v1; V3 = t.v2;
+                V2 = t.v1; v2color = t.colorv1;
+                V3 = t.v2; v3color = t.colorv2;
             } else {
-                V2 = t.v2; V3 = t.v1;
+                V2 = t.v2; v2color = t.colorv2;
+                V3 = t.v1; v3color = t.colorv1;
             }
 
         } else if (t.v1.y >= t.v0.y && t.v1.y >= t.v2.y){
-            V1 = t.v1;
+            V1 = t.v1; v1color = t.colorv1;
 
             //Getting second and third vertex (from top to bottom)
             if(t.v0.y > t.v2.y){
-                V2 = t.v0; V3 = t.v2;
+                V2 = t.v0; v2color = t.colorv0;
+                V3 = t.v2; v3color = t.colorv2;
             } else {
-                V3 = t.v2; V3 = t.v0;
+                V2 = t.v2; v2color = t.colorv2;
+                V3 = t.v0; v3color = t.colorv0;
             }
 
         } else if (t.v2.y >= t.v0.y && t.v2.y >= t.v1.y){
-            V1 = t.v2;
+            V1 = t.v2; v1color = t.colorv2;
 
             //Getting second and third vertex (from top to bottom)
             if(t.v0.y > t.v1.y){
-                V2 = t.v0; V3 = t.v1;
+                V2 = t.v0; v2color = t.colorv0;
+                V3 = t.v1; v3color = t.colorv1;
             } else {
-                V2 = t.v1; V3 = t.v0;
+                V2 = t.v1; v2color = t.colorv1;
+                V3 = t.v0; v3color = t.colorv0;
             }
         }
 
-        //Detecting if triangle is inverted or upright
+        //Detecting if triangle is inverted or upright (boca arriba o boca abajo)
         if(round(V1.y) == round(V2.y) || round(V1.y) == round(V3.y)){
             inverted_triangle = true;
         } else if (round(V2.y) == round(V3.y)){
@@ -570,9 +577,9 @@ public:
 
             if(test_z_buffer(V1.x, V1.y, (float)V1.z)){
                 RGBA_color V1_color;
-                V1_color.r = t.colorv0[0];
-                V1_color.g = t.colorv0[1];
-                V1_color.b = t.colorv0[2];
+                V1_color.r = v1color[0];
+                V1_color.g = v1color[1];
+                V1_color.b = v1color[2];
                 V1_color.a = 1;
 
                 set_to_color_buffer(V1.x, V1.y, V1_color);
@@ -597,8 +604,8 @@ public:
                 limit_right = V1.x + n*incx2;
 
                 // calculate colors and depths at the right/left limits (along the edges): 
-                color1 = interpolate_colors(t.colorv1, t.colorv0, (float)(n / height_r));
-                color2 = interpolate_colors(t.colorv2, t.colorv0, (float)(n / height_r));
+                color1 = interpolate_colors(v2color, v1color, (float)(n / height_r));
+                color2 = interpolate_colors(v3color, v1color, (float)(n / height_r));
 
                 depth1 = interpolate_depths(V2.z, V1.z, (float)(n / height_r));
                 depth2 = interpolate_depths(V3.z, V1.z, (float)(n / height_r));
@@ -612,14 +619,14 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)){
-                        cout<<"entre_Aqi"<<endl;
+                        cout<<"upright triangle"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         /*if (g_Shading == 1)
                             set_to_color_buffer(posx, posy, color12);
                         else
                             set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
 
-                        set_to_color_buffer(posx,posy, color12);
+                        set_to_color_buffer(posx,posy, average_color(v1color, v2color, v3color));
                     }
                 }
 
@@ -631,9 +638,9 @@ public:
             // put first vertex in the color/z buffer.
             if (test_z_buffer(V2.x, V2.y, (float)V2.z)) {
                 RGBA_color V2color;
-                V2color.r = t.colorv1[0];
-                V2color.g = t.colorv1[1];
-                V2color.b = t.colorv1[2];
+                V2color.r = v2color[0];
+                V2color.g = v2color[1];
+                V2color.b = v2color[2];
                 V2color.a = 1;
                 set_to_color_buffer(V2.x, V2.y, V2color);
             }
@@ -661,8 +668,8 @@ public:
                 }
 
                 // calculate colors and depths at the right/left limits (along the edges): 
-                color1 = interpolate_colors(t.colorv0, t.colorv1, (float)(n / height_r));
-                color2 = interpolate_colors(t.colorv2, t.colorv1, (float)(n / height_r));
+                color1 = interpolate_colors(v1color, v2color, (float)(n / height_r));
+                color2 = interpolate_colors(v3color, v2color, (float)(n / height_r));
 
                 depth1 = interpolate_depths(V1.z, V2.z, (float)(n / height_r));
                 depth2 = interpolate_depths(V3.z, V2.z, (float)(n / height_r));
@@ -676,13 +683,14 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)){
+                        cout<<"inverted triangle"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         /*if (g_Shading == 1)
                             set_to_color_buffer(posx, posy, color12);
                         else
                             set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
 
-                        set_to_color_buffer(posx, posy, color12);
+                        set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
                     }
                 }
 
@@ -694,9 +702,9 @@ public:
 
             if(test_z_buffer(V1.x, V1.y, (float)V1.z)){
                 RGBA_color V1_color;
-                V1_color.r = t.colorv0[0];
-                V1_color.g = t.colorv0[1];
-                V1_color.b = t.colorv0[2];
+                V1_color.r = v1color[0];
+                V1_color.g = v1color[1];
+                V1_color.b = v1color[2];
                 V1_color.a = 1;
 
                 set_to_color_buffer(V1.x, V1.y, V1_color);
@@ -730,8 +738,8 @@ public:
                 }
 
                 // calculate colors and depths at the right/left limits (along the edges): 
-                color1 = interpolate_colors(t.colorv1, t.colorv0, (float)(n / height_r));
-                color2 = interpolate_colors(t.colorv2, t.colorv1, (float)(n / height_r));
+                color1 = interpolate_colors(v2color, v1color, (float)(n / height_r));
+                color2 = interpolate_colors(v3color, v1color, (float)(n / height_r));
 
                 depth1 = interpolate_depths(V2.z, V1.z, (float)(n / height_r));
                 depth2 = interpolate_depths(V3.z, V1.z, (float)(n / height_r));
@@ -745,13 +753,14 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)) {
+                        cout<<"Generic case"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         /*if (g_Shading == 1)
                             set_to_color_buffer(posx, posy, color12);
                         else
                             set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
 
-                        set_to_color_buffer(posx, posy, color12);
+                        set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
                     }
 
                 }
@@ -762,17 +771,17 @@ public:
             // Second part of implementation of the most generic case
 
             // V2 is always the bottom vertex.
-            bottom = V2; bottomcolor = t.colorv1;
+            bottom = V2; bottomcolor = v2color;
             if (V1.x >= V3.x){ 
                 left = V3;
-                leftcolor = t.colorv2;
+                leftcolor = v3color;
                 right = V1;
-                rightcolor = t.colorv0;
+                rightcolor = v1color;
             } else { 
                 left = V1;
-                leftcolor = t.colorv0;
+                leftcolor = v1color;
                 right = V3;
-                rightcolor = t.colorv2;
+                rightcolor = v3color;
             }
 
             height_r = V3.y - V2.y;
@@ -801,8 +810,7 @@ public:
             y = bottom.y;
 
             // incrementing y one at a time, rasterize each line.
-            for (float n = 1; n <= height_r; n += 0.5)
-            {
+            for (float n = 1; n <= height_r; n += 0.5) {
                 limit_left = bottom.x + n * incx1;
                 limit_right = bottom.x + n * incx2;
 
@@ -814,8 +822,7 @@ public:
                 depth1 = interpolate_depths(left.z, bottom.z, (float)(n / height_r));
                 depth2 = interpolate_depths(right.z, bottom.z, (float)(n / height_r));
 
-                for (int x = limit_left; x <= limit_right; x++)
-                {
+                for (int x = limit_left; x <= limit_right; x++) {
                     int posx = (int)round(x);
                     int posy = (int)round(y);
 
@@ -823,15 +830,15 @@ public:
                     color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
-                    if (test_z_buffer(posx, posy, depth12))
-                    {
+                    if (test_z_buffer(posx, posy, depth12)) {
+                        cout<<"Generic case"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         /*if (g_Shading == 1)
                             set_to_color_buffer(posx, posy, color12);
                         else
                             set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
 
-                        set_to_color_buffer(posx, posy, average_color(t.colorv0, t.colorv1, t.colorv2));
+                        set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
                     }
 
                 }
@@ -839,21 +846,6 @@ public:
             }
 
         }
-
-        for(int i=0; i<=100; i++){
-            cout<<color_buffer[i].r<<endl;
-            cout<<color_buffer[i].g<<endl;
-            cout<<color_buffer[i].b<<endl;
-            cout<<color_buffer[i].a<<endl;
-            cout<<"*****************"<<endl;
-        }
-
-        cout<<"--------------------------------------"<<endl;
-
-        /*cout<<glm::to_string(V1)<<endl;
-        cout<<glm::to_string(V2)<<endl;
-        cout<<glm::to_string(V3)<<endl;
-        cout<<"-----------------------------------"<<endl;*/
 
     }
 
@@ -876,6 +868,9 @@ public:
         }else{
             //Loading the shader program
             custom_shader.use();
+
+            //Clearing close2gl buffers
+            clear_buffers();
 
             //create transformations
             glm::mat4 model         = glm::mat4(1.0f);
@@ -975,7 +970,7 @@ public:
 
             clipped_triangles = temp;
 
-            cout<<clipped_triangles.size()<<endl;
+            //cout<<clipped_triangles.size()<<endl;
 
             /********************** UNTIL HERE ASSIGNMENT2 ENDS *******************************/
 
@@ -992,12 +987,63 @@ public:
                 rasterize_triangle(clipped_triangles[i]);
             }
 
-            // Drawing color buffer
-            glDrawPixels(WINDOW_WIDTH, WINDOW_HEIGHT, GL_RGBA, GL_FLOAT, color_buffer);
 
-            //glfwSwapBuffers(this);
+            //cout<<"*****************************************"<<endl;
+
+            //Creating vertex and coordinates data to render two triangles and apply texture
+            /*float vertex_data[12] = {-1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 
+                                 1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f};
+
+            float texture_coords[12] = {0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+                                    1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f};*/
+
+            // vertex_data containing information about vertex and texture
+            float vertex_data[24] = {-1.0f, -1.0f, 0.0f, 0.0f, 
+                                        1.0f, -1.0f, 1.0f, 0.0f, 
+                                        1.0f, 1.0f, 1.0f, 1.0f,
+                                        1.0f, 1.0f, 1.0f, 1.0f, 
+                                        -1.0f, 1.0f, 0.0f, 1.0f, 
+                                        -1.0f, -1.0f, 0.0f, 0.0f};
+
+            unsigned int VBO, VAO;
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+
+            //binding VAO
+            glBindVertexArray(VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data), vertex_data, GL_STATIC_DRAW);
+            //Vertex coordinates information
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            //Texture coordinates information 
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+            glEnableVertexAttribArray(1);
+
+            //Creating texture
+            unsigned int texture;
+            glGenTextures(1, &texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
+
+            //Teture creation/manipulations
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, WINDOW_WIDTH, WINDOW_HEIGHT,0, GL_RGBA, GL_FLOAT, color_buffer);
+
+            //Actual drawing
+            glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
+            //Unbinding the VBO buffer
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+
+            // Passing only color as uniform to the fragment shader. Retrieving the matrix uniform locations
+            unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
+
+            // pass matrix uniform locations to the shaders
+            glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
+
+            //glActiveTexture(GL_TEXTURE1);
 
             /*cout<<glm::to_string(clipped_triangles[0].v0)<<endl;
             cout<<glm::to_string(clipped_triangles[0].v1)<<endl;
