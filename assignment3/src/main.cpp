@@ -588,11 +588,9 @@ public:
             // select pair of active edges as V1V2 (1) and V1V3 (2).
             dx1 = V2.x - V1.x;
             dy1 = V1.y - V2.y;
-            //dy1 = V2.y - V1.y;
 
             dx2 = V3.x - V1.x;
             dy2 = V1.y - V3.y;
-            //dy2 = V3.y - V1.y;
 
             height_r = dy1; // doesn't matter which since V2.y = V3.y
             incx1 = dx1 / dy1;
@@ -601,7 +599,7 @@ public:
             y = V1.y;
 
             //Performing actual rasterization incrementing y one at a time.
-            for(float n=1; n <= height_r; n+=0.5f){
+            for(float n=1; n <= height_r; n+=1.0f){
                 limit_left = V1.x + n*incx1;
                 limit_right = V1.x + n*incx2;
 
@@ -632,7 +630,7 @@ public:
                     }
                 }
 
-                y -= 0.5;
+                y -= 1.0;
 
             }
 
@@ -660,7 +658,7 @@ public:
 
             y = V2.y;
 
-            for(float n=1; n <= height_r; n+=0.5f){
+            for(float n=1; n <= height_r; n+=1.0f){
                 if(V1.x <= V3.x){
                     limit_left = V2.x + n * incx1;
                     limit_right = V2.x + n * incx2;
@@ -696,7 +694,7 @@ public:
                     }
                 }
 
-                y += 0.5f;
+                y += 1.0f;
 
             }
 
@@ -729,7 +727,7 @@ public:
 
             y = V1.y;
 
-            for (float n = 1; n <= height_r; n += 0.5f){
+            for (float n = 1; n <= height_r; n += 1.0f){
 
                 if (V2.x <= V3.x){
 
@@ -769,13 +767,13 @@ public:
 
                 }
 
-                y -= 0.5;
+                y -= 1.0;
             }
 
             // Second part of implementation of the most generic case
 
             // V2 is always the bottom vertex.
-            bottom = V2; bottomcolor = v2color;
+            /*bottom = V2; bottomcolor = v2color;
             if (V1.x >= V3.x){ 
                 left = V3;
                 leftcolor = v3color;
@@ -786,9 +784,22 @@ public:
                 leftcolor = v1color;
                 right = V3;
                 rightcolor = v3color;
+            }*/
+
+            bottom = V3; bottomcolor = v3color;
+            if (V1.x >= V2.x){ 
+                left = V2;
+                leftcolor = v2color;
+                right = V1;
+                rightcolor = v1color;
+            } else { 
+                left = V1;
+                leftcolor = v1color;
+                right = V2;
+                rightcolor = v2color;
             }
 
-            height_r = V3.y - V2.y;
+            height_r = V2.y - V3.y;
 
             // put first vertex in the color/z buffer.
             if (test_z_buffer(bottom.x, bottom.y, (float)bottom.z))
@@ -814,7 +825,7 @@ public:
             y = bottom.y;
 
             // incrementing y one at a time, rasterize each line.
-            for (float n = 1; n <= height_r; n += 0.5) {
+            for (float n = 1; n <= height_r; n += 1.0f) {
                 limit_left = bottom.x + n * incx1;
                 limit_right = bottom.x + n * incx2;
 
@@ -846,7 +857,7 @@ public:
                     }
 
                 }
-                y += 0.5;
+                y += 1.0f;
             }
 
         }
