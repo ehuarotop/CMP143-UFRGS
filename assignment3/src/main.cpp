@@ -587,12 +587,12 @@ public:
 
             // select pair of active edges as V1V2 (1) and V1V3 (2).
             dx1 = V2.x - V1.x;
-            //dy1 = V1.y - V2.y;
-            dy1 = V2.y - V1.y;
+            dy1 = V1.y - V2.y;
+            //dy1 = V2.y - V1.y;
 
             dx2 = V3.x - V1.x;
-            //dy2 = V1.y - V3.y;
-            dy2 = V3.y - V1.y;
+            dy2 = V1.y - V3.y;
+            //dy2 = V3.y - V1.y;
 
             height_r = dy1; // doesn't matter which since V2.y = V3.y
             incx1 = dx1 / dy1;
@@ -621,7 +621,7 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)){
-                        cout<<"upright triangle"<<endl;
+                        //cout<<"upright triangle"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         /*if (g_Shading == 1)
                             set_to_color_buffer(posx, posy, color12);
@@ -685,7 +685,7 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)){
-                        cout<<"inverted triangle"<<endl;
+                        //cout<<"inverted triangle"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         /*if (g_Shading == 1)
                             set_to_color_buffer(posx, posy, color12);
@@ -714,18 +714,18 @@ public:
 
             // select pair of active edges as V1V2 (1) and V1V3 (2).
             dx1 = V2.x - V1.x;
-            //dy1 = V1.y - V2.y;
-            dy1 = V2.y - V1.y;
+            dy1 = V1.y - V2.y;
+            //dy1 = V2.y - V1.y;
 
             dx2 = V3.x - V1.x;
-            //dy2 = V1.y - V3.y;
-            dy2 = V3.y - V1.y;
+            dy2 = V1.y - V3.y;
+            //dy2 = V3.y - V1.y;
 
             incx1 = dx1 / dy1;
             incx2 = dx2 / dy2;
 
             //V2 is always lower than V3.
-            height_r = dy2;
+            height_r = dy1;
 
             y = V1.y;
 
@@ -757,7 +757,7 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)) {
-                        cout<<"Generic case"<<endl;
+                        //cout<<"Generic case"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         /*if (g_Shading == 1)
                             set_to_color_buffer(posx, posy, color12);
@@ -835,7 +835,7 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)) {
-                        cout<<"Generic case"<<endl;
+                        //cout<<"Generic case"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         /*if (g_Shading == 1)
                             set_to_color_buffer(posx, posy, color12);
@@ -1034,12 +1034,6 @@ public:
 
             // pass matrix uniform locations to the shaders
             glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
-
-            //glActiveTexture(GL_TEXTURE1);
-
-            /*cout<<glm::to_string(clipped_triangles[0].v0)<<endl;
-            cout<<glm::to_string(clipped_triangles[0].v1)<<endl;
-            cout<<glm::to_string(clipped_triangles[0].v2)<<endl;*/
 
             /********************** HERE ENDS ASSIGNMENT 3 **********************************/            
 
