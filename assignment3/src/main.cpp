@@ -1001,12 +1001,19 @@ public:
             }
 
             // vertex_data containing information about vertex and texture
-            float vertex_data[24] = {-1.0f, -1.0f, 0.0f, 0.0f, 
+            /*float vertex_data[24] = {-1.0f, -1.0f, 0.0f, 0.0f, 
                                         1.0f, -1.0f, 1.0f, 0.0f, 
                                         1.0f, 1.0f, 1.0f, 1.0f,
                                         1.0f, 1.0f, 1.0f, 1.0f, 
                                         -1.0f, 1.0f, 0.0f, 1.0f, 
-                                        -1.0f, -1.0f, 0.0f, 0.0f};
+                                        -1.0f, -1.0f, 0.0f, 0.0f};*/
+
+            float vertex_data[24] = {-1.0f, -1.0f, 0.0f, 1.0f, 
+                                        1.0f, -1.0f, 1.0f, 1.0f, 
+                                        1.0f, 1.0f, 1.0f, 0.0f,
+                                        1.0f, 1.0f, 1.0f, 0.0f, 
+                                        -1.0f, 1.0f, 0.0f, 0.0f, 
+                                        -1.0f, -1.0f, 0.0f, 1.0f};
 
             unsigned int VBO, VAO;
             glGenVertexArrays(1, &VAO);
