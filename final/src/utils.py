@@ -3,6 +3,9 @@ import subprocess
 import cv2 as cv
 import os
 import psycopg2
+import csv
+import pandas as pd
+import numpy as np
 
 def execParallel(function_name, args, data_to_be_processed):
     '''
@@ -117,3 +120,25 @@ def exec_custom_sql(sql_query):
     con.close()
 
     return rows
+
+def get_dataframe_from_csv(csv_path):
+    headers = []
+    image_features = []
+
+    with open(csv_path, 'r') as f:
+        reader = csv.reader(f)
+        read_images = list(reader)
+
+        headers = read_images[0]
+        image_features = read_images[1:]
+
+    #Parsing data
+    for idx, image in enumerate(image_features):
+        image[1] = np.fromstring(image[1][1:-1], dtype=np.float32, sep=' ') #RGB
+        image[2] = np.log(np.fromstring(image[2][2:-2],dtype=np.float32, sep=' ').reshape(256,1)[:,0] + 10**(-6)) #LOG
+        image[3] = np.fromstring(image[3][1:-1],dtype=np.float32, sep=' ').reshape(20,1) #PCA
+
+    #Getting features in pandas dataframe
+    image_features = pd.DataFrame.from_records(image_features, columns=headers)
+
+    return image_features

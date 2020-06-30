@@ -147,7 +147,7 @@ pd_images.to_csv("features.csv", index=False)
 
 print("Done")
 
-################### Until here execute separately ###################
+################### Until here execute separately (first generation of features / without PCA FFT applied)###################
 
 ################### Getting PCA components and generating new CSV file ###################
 
@@ -162,8 +162,8 @@ with open("features.csv", 'r') as f:
 	image_features = read_images[1:]
 
 for idx, image in enumerate(image_features):
-	image[1] = np.fromstring(image[1][1:-1], dtype=np.float32, sep=' ')
-	image[2] = np.log(np.fromstring(image[2][2:-2],dtype=np.float32, sep=' ').reshape(256,1)[:,0] + 10**(-6))
+	#image[1] = np.fromstring(image[1][1:-1], dtype=np.float32, sep=' ')
+	#image[2] = np.log(np.fromstring(image[2][2:-2],dtype=np.float32, sep=' ').reshape(256,1)[:,0] + 10**(-6))
 	image[3] = np.fromstring(image[3][2:-2],dtype=np.float32, sep=' ').reshape(100,100)
 	image[4] = np.fromstring(image[4][2:-2],dtype=np.float32, sep=' ').reshape(100,100)
 
@@ -178,4 +178,4 @@ image_features = image_features[['filename', 'img_norm_hist3d', 'norm_hist', 'ff
 
 image_features.to_csv("features_with_pca.csv", index=False)
 
-
+################### END of Getting PCA components and generating new CSV file ###################
