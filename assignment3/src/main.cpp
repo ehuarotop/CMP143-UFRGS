@@ -106,8 +106,12 @@ float g_far_plane = 3000.0f;
 int fpsrate_opengl = 0.0f;
 int fpsrate_close2gl = 0.0f;
 
+//Controlling phong illumination model for close2GL
+bool g_LightsOn = false;
+
 //ambient, diffuse and specular colors
 glm::vec3 g_ambient[MAX_MATERIAL_COUNT], g_diffuse[MAX_MATERIAL_COUNT], g_specular[MAX_MATERIAL_COUNT];
+float g_shine[MAX_MATERIAL_COUNT];
 
 ///////////////////////////////// CANVAS DECLARATION OPENGL /////////////////////////////////
 class MyGLCanvas : public GLCanvas{
@@ -359,10 +363,28 @@ public:
 
 
     //Variables for rasterization
-
     struct RGBA_color{
         float r,g,b,a;
     };
+
+    //Light variables
+    struct Light {
+        float att[3];
+        glm::vec4 direction;
+        glm::vec4 ambient;
+        glm::vec4 diffuse;
+        glm::vec4 specular;
+        //Model::Material mat;
+    };
+
+    // Material Color
+    float g_MatAmbient[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
+    float g_MatDiffuse[4] = { 0.5f, 0.0f, 0.0f, 1.0f };
+
+    // Light parameter
+    float g_LightMultiplier = 1.0f;
+    float g_LightDirection[3] = { 1.1547f, -1.1547f, 1.1547f };
+    Light light;
 
     double *z_buffer;  //depth buffer
     RGBA_color *color_buffer; //color buffer
@@ -449,6 +471,81 @@ public:
     void setCullingOrientation(unsigned int culling_orientation){
         this->culling_orientation = culling_orientation;
     }
+
+
+    void set_light(){
+        
+        light.direction.x = -g_LightDirection[0];
+        light.direction.y = -g_LightDirection[1];
+        light.direction.z = -g_LightDirection[2];
+        light.direction.w = 0.0f;
+
+        light.ambient = glm::vec4(g_ambient[0], 1.0f);
+        light.diffuse = glm::vec4(g_diffuse[0], 1.0f);
+        light.specular = glm::vec4(g_specular[0], 1.0f);
+
+        /*light.ambient[0] = light.mat.mat_ambient[1] = light.mat.mat_ambient[2] = g_LightMultiplier*0.2f;
+        light.mat.mat_ambient[3] = 1.0f;
+
+        light.mat.mat_diffuse[0] = light.mat.mat_diffuse[1] = light.mat.mat_diffuse[2] = g_LightMultiplier*0.8f;
+        light.mat.mat_diffuse[3] = 1.0f;
+
+        light.mat.mat_specular[0] = light.mat.mat_specular[1] = light.mat.mat_specular[2] = 1.0f;
+
+        light.att[0] = 1.0f;
+        light.att[1] = light.att[2] = 0.0f;
+
+        light.ambient[0] = light.ambient[1] = light.ambient[2] = 0.0f;
+        light.ambient[3] = 1.0f;*/
+    }
+
+    glm::vec3 phong_illumination_model(glm::vec4 v, glm::vec3 v_normal) {
+        double I, att, distance, kd;
+        //Model::Material mat = m.material;
+        glm::vec4 N = glm::vec4(v_normal, 1.0f);
+
+        glm::vec3 vcolor; // vertex color
+        
+        //N.z = -N.z;
+        N = glm::normalize(N);
+        for (int channel = 0; channel < 3; channel++) {
+            I = 0;
+            I = light.ambient[channel] * g_MatDiffuse[channel];
+            
+            if (g_LightsOn) {
+                static glm::vec4 L, R, V;
+                static glm::vec3 view;
+                static double NL_dot, RV_dot;
+                // ambient part
+                I += light.ambient[channel] * g_MatDiffuse[channel];
+                // attenuation
+                distance = matrix.distanceV(light.direction, v);
+                att = 1.0 / (light.att[0] + distance*light.att[1] + distance*distance*light.att[2]);
+                if (att > 1)
+                    att = 1;
+                // diffuse part
+                L = light.direction - v;
+                L = glm::normalize(L);
+                NL_dot = matrix.dotProduct(N, L);
+                if (NL_dot > 0) {
+                    I += att * NL_dot * light.diffuse[channel] * g_MatDiffuse[channel];
+                    // specular part if specular element present
+                    R = 2 * matrix.dotProduct(N, L)*N - L;
+                    R = glm::normalize(R);
+                    view = close2gl.position - glm::vec3(v);
+                    view = glm::normalize(view);
+                    RV_dot = matrix.dotProduct(view, glm::vec3(R));
+                    if (RV_dot > 0)
+                        I += att * light.specular[channel] * g_MatDiffuse[channel] * pow(RV_dot, g_shine[0]);
+                }
+            }
+            vcolor[channel] = I;
+        }
+
+        return vcolor;
+    }
+
+
 
     /****************** Rasterization methods **********************/
     void clear_buffers(){
@@ -886,6 +983,7 @@ public:
 
             //Clearing close2gl buffers
             clear_buffers();
+            set_light();
 
             //create transformations
             glm::mat4 model         = glm::mat4(1.0f);
@@ -926,6 +1024,13 @@ public:
             triangles = read_triangles;
 
             for (int i=0; i<triangles.size(); i++){
+
+                if(g_LightsOn){
+                    //Perform phong illumination model
+                    triangles[i].colorv0 = phong_illumination_model(triangles[i].v0, triangles[i].normal[0]);
+                    triangles[i].colorv1 = phong_illumination_model(triangles[i].v1, triangles[i].normal[1]);
+                    triangles[i].colorv2 = phong_illumination_model(triangles[i].v2, triangles[i].normal[2]);
+                }
 
                 triangles[i].v0 = matrix.transform_vector(triangles[i].v0, modelViewProj);
                 triangles[i].v1 = matrix.transform_vector(triangles[i].v1, modelViewProj);
@@ -1317,6 +1422,12 @@ public:
         phong->setCallback([this](){
             mCanvasObject->setShading(3);
             mCanvasObjectC2GL->setShading(3);
+            
+            if(g_LightsOn){
+                g_LightsOn = false;
+            } else {
+                g_LightsOn = true;
+            }
         });
 
         performLayout();
@@ -1752,7 +1863,7 @@ vector<Triangle_c2gl> readFile_close2gl(const char* filename){
         fscanf(fp, "ambient color %f %f %f\n", &(g_ambient[i].x), &(g_ambient[i].y), &(g_ambient[i].z));
         fscanf(fp, "diffuse color %f %f %f\n", &(g_diffuse[i].x), &(g_diffuse[i].y), &(g_diffuse[i].z));
         fscanf(fp, "specular color %f %f %f\n", &(g_specular[i].x), &(g_specular[i].y), &(g_specular[i].z));
-        fscanf(fp, "material shine %f\n", &(shine[i]));
+        fscanf(fp, "material shine %f\n", &(g_shine[i]));
     }
 
     // skiping documentation line

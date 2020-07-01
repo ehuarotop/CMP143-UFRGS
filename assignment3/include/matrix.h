@@ -127,6 +127,15 @@ public:
 		return vector;
 	}
 
+	float distanceV( const glm::vec4 v1,  const glm::vec4 v2 ) {
+	    
+	    float dx = v1.x - v2.x;
+	    float dy = v1.y - v2.y;
+	    float dz = v1.z - v2.z;
+
+	    return (float)sqrt( dx * dx + dy * dy + dz * dz );
+	}
+
 };
 
 
