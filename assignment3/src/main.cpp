@@ -378,12 +378,12 @@ public:
     };
 
     // Material Color
-    float g_MatAmbient[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
-    float g_MatDiffuse[4] = { 0.5f, 0.0f, 0.0f, 1.0f };
+    float g_MatAmbient[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
+    float g_MatDiffuse[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
     // Light parameter
     float g_LightMultiplier = 1.0f;
-    float g_LightDirection[3] = { 1.1547f, -1.1547f, 1.1547f };
+    float g_LightDirection[3] = { 0.0f, 0.0f, -1.0f };
     Light light;
 
     double *z_buffer;  //depth buffer
@@ -453,6 +453,11 @@ public:
         //camera.setModel(model_used);
         close2gl.setModel(model_used);
 
+        //Setting light direction
+        g_LightDirection[0] = 0.0f;
+        g_LightDirection[1] = 0.0f;
+        g_LightDirection[2] = distanceProjSphere + 100;
+
         firstMouse = true;
     }
 
@@ -480,9 +485,15 @@ public:
         light.direction.z = -g_LightDirection[2];
         light.direction.w = 0.0f;
 
-        light.ambient = glm::vec4(g_ambient[0], 1.0f);
+        /*light.ambient = glm::vec4(g_ambient[0], 1.0f);
         light.diffuse = glm::vec4(g_diffuse[0], 1.0f);
-        light.specular = glm::vec4(g_specular[0], 1.0f);
+        light.specular = glm::vec4(g_specular[0], 1.0f);*/
+
+        light.ambient.x = light.ambient.y = light.ambient.z = g_LightMultiplier*0.2f;
+        light.diffuse.x = light.diffuse.y = light.diffuse.z = g_LightMultiplier*0.8f;
+        light.specular.x = light.specular.y = light.specular.z = 1.0f;
+
+        light.att[0] = 1.0f; light.att[1] = 0.0f; light.att[2] = 0.0f;
 
         /*light.ambient[0] = light.mat.mat_ambient[1] = light.mat.mat_ambient[2] = g_LightMultiplier*0.2f;
         light.mat.mat_ambient[3] = 1.0f;
@@ -501,7 +512,6 @@ public:
 
     glm::vec3 phong_illumination_model(glm::vec4 v, glm::vec3 v_normal) {
         double I, att, distance, kd;
-        //Model::Material mat = m.material;
         glm::vec4 N = glm::vec4(v_normal, 1.0f);
 
         glm::vec3 vcolor; // vertex color
@@ -682,18 +692,34 @@ public:
                 set_to_color_buffer(V1.x, V1.y, V1_color);
             }
 
-            // select pair of active edges as V1V2 (1) and V1V3 (2).
-            dx1 = V2.x - V1.x;
-            dy1 = V1.y - V2.y;
+            if (drawing_mode == 1 || drawing_mode == 2){
+                // select pair of active edges as V1V2 (1) and V1V3 (2).
+                dx1 = V2.x - V1.x;
+                dy1 = V2.y - V1.y;
 
-            dx2 = V3.x - V1.x;
-            dy2 = V1.y - V3.y;
+                dx2 = V3.x - V1.x;
+                dy2 = V3.y - V1.y;
 
-            height_r = dy1; // doesn't matter which since V2.y = V3.y
-            incx1 = dx1 / dy1;
-            incx2 = dx2 / dy2;
+                height_r = dy1; // doesn't matter which since V2.y = V3.y
 
-            y = V1.y;
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
+
+                y = V1.y;
+            } else if (drawing_mode == 3){
+                // select pair of active edges as V1V2 (1) and V1V3 (2).
+                dx1 = V2.x - V1.x;
+                dy1 = V1.y - V2.y;
+
+                dx2 = V3.x - V1.x;
+                dy2 = V1.y - V3.y;
+
+                height_r = dy1; // doesn't matter which since V2.y = V3.y
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
+
+                y = V1.y;
+            }
 
             //Performing actual rasterization incrementing y one at a time.
             for(float n=1; n <= height_r; n+=1.0f){
@@ -716,14 +742,13 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)){
-                        //cout<<"upright triangle"<<endl;
                         // z buffer test came back positive. pixel is visible.
-                        /*if (g_Shading == 1)
+                        if (shading_type == 1 || shading_type == 2)
                             set_to_color_buffer(posx, posy, color12);
                         else
-                            set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
+                            set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
 
-                        set_to_color_buffer(posx,posy, average_color(v1color, v2color, v3color));
+                        //set_to_color_buffer(posx,posy, average_color(v1color, v2color, v3color));
                     }
                 }
 
@@ -742,18 +767,33 @@ public:
                 set_to_color_buffer(V2.x, V2.y, V2color);
             }
 
-            // select pair of active edges as V2V1 (1) and V2V3 (2).
-            dx1 = V2.x - V1.x;
-            dy1 = V2.y - V1.y;
+            if(drawing_mode == 1 || drawing_mode == 2){
+                // select pair of active edges as V2V1 (1) and V2V3 (2).
+                dx1 = V2.x - V1.x;
+                dy1 = V2.y - V1.y;
 
-            dx2 = V2.x - V3.x;
-            dy2 = V2.y - V3.y;
+                dx2 = V2.x - V3.x;
+                dy2 = V2.y - V3.y;
 
-            height_r = -dy1; // doesn't matter which since V1.y = V3.y
-            incx1 = dx1 / dy1;
-            incx2 = dx2 / dy2;
+                height_r = -dy1; // doesn't matter which since V1.y = V3.y
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
 
-            y = V2.y;
+                y = V2.y;
+            } else if (drawing_mode == 3){
+                // select pair of active edges as V2V1 (1) and V2V3 (2).
+                dx1 = V2.x - V1.x;
+                dy1 = V2.y - V1.y;
+
+                dx2 = V2.x - V3.x;
+                dy2 = V2.y - V3.y;
+
+                height_r = -dy1; // doesn't matter which since V1.y = V3.y
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
+
+                y = V2.y;
+            }
 
             for(float n=1; n <= height_r; n+=1.0f){
                 if(V1.x <= V3.x){
@@ -780,14 +820,13 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)){
-                        //cout<<"inverted triangle"<<endl;
                         // z buffer test came back positive. pixel is visible.
-                        /*if (g_Shading == 1)
+                        if (shading_type == 1 || shading_type == 2)
                             set_to_color_buffer(posx, posy, color12);
                         else
-                            set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
+                            set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
 
-                        set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        //set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
                     }
                 }
 
@@ -807,22 +846,37 @@ public:
                 set_to_color_buffer(V1.x, V1.y, V1_color);
             }
 
-            // select pair of active edges as V1V2 (1) and V1V3 (2).
-            dx1 = V2.x - V1.x;
-            dy1 = V1.y - V2.y;
-            //dy1 = V2.y - V1.y;
+            if(drawing_mode == 1 || drawing_mode == 2){
+                // select pair of active edges as V1V2 (1) and V1V3 (2).
+                dx1 = V2.x - V1.x;
+                dy1 = V2.y - V1.y;
 
-            dx2 = V3.x - V1.x;
-            dy2 = V1.y - V3.y;
-            //dy2 = V3.y - V1.y;
+                dx2 = V3.x - V1.x;
+                dy2 = V3.y - V1.y;
 
-            incx1 = dx1 / dy1;
-            incx2 = dx2 / dy2;
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
 
-            //V2 is always lower than V3.
-            height_r = dy1;
+                //V2 is always lower than V3.
+                height_r = dy2;
 
-            y = V1.y;
+                y = V1.y;
+            } else if (drawing_mode == 3){
+                // select pair of active edges as V1V2 (1) and V1V3 (2).
+                dx1 = V2.x - V1.x;
+                dy1 = V1.y - V2.y;
+
+                dx2 = V3.x - V1.x;
+                dy2 = V1.y - V3.y;
+
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
+
+                //V2 is always lower than V3.
+                height_r = dy1;
+
+                y = V1.y;
+            }
 
             for (float n = 1; n <= height_r; n += 1.0f){
 
@@ -852,14 +906,13 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)) {
-                        //cout<<"Generic case"<<endl;
                         // z buffer test came back positive. pixel is visible.
-                        /*if (g_Shading == 1)
+                        if (shading_type == 1 || shading_type == 2)
                             set_to_color_buffer(posx, posy, color12);
                         else
-                            set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
+                            set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
 
-                        set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        //set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
                     }
 
                 }
@@ -869,34 +922,52 @@ public:
 
             // Second part of implementation of the most generic case
 
-            // V2 is always the bottom vertex.
-            /*bottom = V2; bottomcolor = v2color;
-            if (V1.x >= V3.x){ 
-                left = V3;
-                leftcolor = v3color;
-                right = V1;
-                rightcolor = v1color;
-            } else { 
-                left = V1;
-                leftcolor = v1color;
-                right = V3;
-                rightcolor = v3color;
-            }*/
+            if(drawing_mode == 1 || drawing_mode == 2){
+                // V2 is always the bottom vertex.
+                bottom = V2; bottomcolor = v2color;
+                if (V1.x >= V3.x){ 
+                    left = V3;
+                    leftcolor = v3color;
+                    right = V1;
+                    rightcolor = v1color;
+                } else { 
+                    left = V1;
+                    leftcolor = v1color;
+                    right = V3;
+                    rightcolor = v3color;
+                }
 
-            bottom = V3; bottomcolor = v3color;
-            if (V1.x >= V2.x){ 
-                left = V2;
-                leftcolor = v2color;
-                right = V1;
-                rightcolor = v1color;
-            } else { 
-                left = V1;
-                leftcolor = v1color;
-                right = V2;
-                rightcolor = v2color;
+                height_r = V3.y - V2.y;
+            } else if(drawing_mode == 3){
+                // V2 is always the bottom vertex.
+                /*bottom = V2; bottomcolor = v2color;
+                if (V1.x >= V3.x){ 
+                    left = V3;
+                    leftcolor = v3color;
+                    right = V1;
+                    rightcolor = v1color;
+                } else { 
+                    left = V1;
+                    leftcolor = v1color;
+                    right = V3;
+                    rightcolor = v3color;
+                }*/
+
+                bottom = V3; bottomcolor = v3color;
+                if (V1.x >= V2.x){ 
+                    left = V2;
+                    leftcolor = v2color;
+                    right = V1;
+                    rightcolor = v1color;
+                } else { 
+                    left = V1;
+                    leftcolor = v1color;
+                    right = V2;
+                    rightcolor = v2color;
+                }
+
+                height_r = V2.y - V3.y;
             }
-
-            height_r = V2.y - V3.y;
 
             // put first vertex in the color/z buffer.
             if (test_z_buffer(bottom.x, bottom.y, (float)bottom.z))
@@ -945,12 +1016,12 @@ public:
                     if (test_z_buffer(posx, posy, depth12)) {
                         //cout<<"Generic case"<<endl;
                         // z buffer test came back positive. pixel is visible.
-                        /*if (g_Shading == 1)
+                        if (shading_type == 1 || shading_type == 2)
                             set_to_color_buffer(posx, posy, color12);
                         else
-                            set_to_color_buffer(posx, posy, average_color(V1.color, V2.color, V3.color));*/
+                            set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
 
-                        set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        //set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
                     }
 
                 }
@@ -1105,14 +1176,6 @@ public:
                 rasterize_triangle(clipped_triangles[i]);
             }
 
-            // vertex_data containing information about vertex and texture
-            /*float vertex_data[24] = {-1.0f, -1.0f, 0.0f, 0.0f, 
-                                        1.0f, -1.0f, 1.0f, 0.0f, 
-                                        1.0f, 1.0f, 1.0f, 1.0f,
-                                        1.0f, 1.0f, 1.0f, 1.0f, 
-                                        -1.0f, 1.0f, 0.0f, 1.0f, 
-                                        -1.0f, -1.0f, 0.0f, 0.0f};*/
-
             float vertex_data[24] = {-1.0f, -1.0f, 0.0f, 1.0f, 
                                         1.0f, -1.0f, 1.0f, 1.0f, 
                                         1.0f, 1.0f, 1.0f, 0.0f,
@@ -1160,36 +1223,10 @@ public:
 
             /********************** HERE ENDS ASSIGNMENT 3 **********************************/            
 
-            //Getting vertices in a 1d array to pass it to the shader
-            /*float vert[6*clipped_triangles.size()];
-
-            for(int i=0; i < clipped_triangles.size(); i++){
-                vert[6*i]   = clipped_triangles[i].v0.x;
-                vert[6*i+1] = clipped_triangles[i].v0.y;
-                vert[6*i+2] = clipped_triangles[i].v1.x;
-                vert[6*i+3] = clipped_triangles[i].v1.y;
-                vert[6*i+4] = clipped_triangles[i].v2.x;
-                vert[6*i+5] = clipped_triangles[i].v2.y;
-            }
-
-            // Dealing with VAOs and VBOs
-            unsigned int VBO, VAO;
-            glGenVertexArrays(1, &VAO);
-            glGenBuffers(1, &VBO);
-            // binding the Vertex Array Object.
-            glBindVertexArray(VAO);
-            glBindBuffer(GL_ARRAY_BUFFER, VBO);
-            //Putting buffer data
-            glBufferData(GL_ARRAY_BUFFER, sizeof(vert), vert, GL_STATIC_DRAW);
-            //Position, # dimensions, data type, ##, 0, 0
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-            //Setting 0 in position (according to the specification on the shader)
-            glEnableVertexAttribArray(0);
-
             // ---------------- Actual Drawing ---------------- //
             //glEnable(GL_DEPTH_TEST);
 
-            if(drawing_mode == 1){
+            /*if(drawing_mode == 1){
                 glDrawArrays(GL_POINTS, 0, clipped_triangles.size()*3);
             } else if (drawing_mode == 2){
                 glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
@@ -1255,6 +1292,7 @@ public:
     Window *windowC2GL;
     Window *windowGUI;
     Window *windowGUI2;
+    Window *windowGUI3;
     MyTextBox *textBox_np;
     MyTextBox *textBox_fp;
     MyTextBox *textBox_fpsrate;
@@ -1404,25 +1442,44 @@ public:
         normal_shading->setCallback([this](){
             mCanvasObject->setShading(0);
             mCanvasObjectC2GL->setShading(0);
+
+            g_LightsOn = false;
+
         });
 
         Button *gouraud_ad = new Button(tools2, "Gouraud AD");
         gouraud_ad->setCallback([this](){
             mCanvasObject->setShading(1);
             mCanvasObjectC2GL->setShading(1);
+
+            g_LightsOn = true;
         });
 
         Button *gouraud_ads = new Button(tools2, "Gouraud ADS");
         gouraud_ads->setCallback([this](){
             mCanvasObject->setShading(2);
             mCanvasObjectC2GL->setShading(2);
+
+            g_LightsOn = true;
         });
 
         Button *phong = new Button(tools2, "Phong");
         phong->setCallback([this](){
             mCanvasObject->setShading(3);
             mCanvasObjectC2GL->setShading(3);
-            
+        });
+
+        //Creating window for GUI options
+        windowGUI3 = new Window(this, "Illumination Models - Close2GL");
+        windowGUI3->setPosition(Vector2i(550,525));
+        windowGUI3->setLayout(new GroupLayout());
+
+        Widget *tools3 = new Widget(windowGUI3);
+        tools3->setLayout(new BoxLayout(Orientation::Vertical,
+                                       Alignment::Fill, 0, 6));
+
+        Button *phong_illumination = new Button(tools3, "Phong Illumination");
+        phong_illumination->setCallback([this](){
             if(g_LightsOn){
                 g_LightsOn = false;
             } else {
