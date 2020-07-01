@@ -142,3 +142,19 @@ def get_dataframe_from_csv(csv_path):
     image_features = pd.DataFrame.from_records(image_features, columns=headers)
 
     return image_features
+
+def get_img_positions_from_csv(csv_path):
+    headers = []
+    image_features = []
+
+    with open(csv_path, 'r') as f:
+        reader = csv.reader(f)
+        read_images = list(reader)
+
+        headers = read_images[0]
+        image_features = read_images[1:]
+
+    for idex, image in enumerate(image_features):
+        image[1] = np.fromstring(image[1][1:-1], dtype=np.float32, sep=' ')
+
+    return image_features

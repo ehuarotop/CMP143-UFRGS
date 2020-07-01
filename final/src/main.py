@@ -9,15 +9,31 @@ import OpenGL.GLUT as GLUT
 from array import array
 import numpy as np
 
+import utils
+
 window = 0 
 width, height = 1024,768
 
 def draw():
     GL.glClear(GL.GL_COLOR_BUFFER_BIT |GL.GL_DEPTH_BUFFER_BIT)           
     GL.glLoadIdentity()
+
+    '''glBegin(GL_TRIANGLE_STRIP);
+    glColor4f(0.8, 0.8, 0.5, 1.0);
+    glVertex3f(startlen, height, startwid);    
+    glVertex3f(startlen, height, startwid + width);
+    glVertex3f(startlen + length, height, startwid);
+    glVertex3f(startlen + length, height, startwid + width);
+    glEnd();'''
+
+
     GLUT.glutSwapBuffers()
 
 def main():
+
+    #Getting image positions
+    img_positions = utils.get_img_positions_from_csv("dataset/Features/positions_all_features.csv")
+
     GLUT.glutInit();
     GLUT.glutInitDisplayMode(GLUT.GLUT_RGBA | GLUT.GLUT_DOUBLE | GLUT.GLUT_ALPHA |
     GLUT.GLUT_DEPTH)

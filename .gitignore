@@ -1,5 +1,5 @@
 bin/
-include/
+final/include/
 lib/
 lib64/
 share/
