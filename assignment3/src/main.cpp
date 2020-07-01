@@ -678,37 +678,21 @@ public:
                 set_to_color_buffer(V1.x, V1.y, V1_color);
             }
 
-            if (drawing_mode == 1 || drawing_mode == 2){
-                // select pair of active edges as V1V2 (1) and V1V3 (2).
-                dx1 = V2.x - V1.x;
-                dy1 = V2.y - V1.y;
+            // select pair of active edges as V1V2 (1) and V1V3 (2).
+            dx1 = V2.x - V1.x;
+            dy1 = V2.y - V1.y;
 
-                dx2 = V3.x - V1.x;
-                dy2 = V3.y - V1.y;
+            dx2 = V3.x - V1.x;
+            dy2 = V3.y - V1.y;
 
-                height_r = dy1; // doesn't matter which since V2.y = V3.y
+            height_r = dy1; // doesn't matter which since V2.y = V3.y
+            incx1 = dx1 / dy1;
+            incx2 = dx2 / dy2;
 
-                incx1 = dx1 / dy1;
-                incx2 = dx2 / dy2;
-
-                y = V1.y;
-            } else if (drawing_mode == 3){
-                // select pair of active edges as V1V2 (1) and V1V3 (2).
-                dx1 = V2.x - V1.x;
-                dy1 = V2.y - V1.y;
-
-                dx2 = V3.x - V1.x;
-                dy2 = V3.y - V1.y;
-
-                height_r = dy1; // doesn't matter which since V2.y = V3.y
-                incx1 = dx1 / dy1;
-                incx2 = dx2 / dy2;
-
-                y = V1.y;
-            }
+            y = V1.y;
 
             //Performing actual rasterization incrementing y one at a time.
-            for(float n=0; n <= height_r; n-=1.0f){
+            for(float n=0; n >= height_r; n-=1.f){
                 limit_left = V1.x + n*incx1;
                 limit_right = V1.x + n*incx2;
 
@@ -733,12 +717,20 @@ public:
                             set_to_color_buffer(posx, posy, color12);
                         else
                             set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                    }
 
-                        //set_to_color_buffer(posx,posy, average_color(v1color, v2color, v3color));
+                    //To draw only points
+                    if(drawing_mode == 1){
+                        break;
                     }
                 }
 
-                y -= 1.0;
+                //To draw only points
+                if(drawing_mode == 1){
+                    break;
+                }
+
+                y -= 1.f;
 
             }
 
@@ -753,41 +745,26 @@ public:
                 set_to_color_buffer(V2.x, V2.y, V2color);
             }
 
-            if(drawing_mode == 1 || drawing_mode == 2){
-                // select pair of active edges as V2V1 (1) and V2V3 (2).
-                dx1 = V2.x - V1.x;
-                dy1 = V2.y - V1.y;
+            // select pair of active edges as V2V1 (1) and V2V3 (2).
+            dx1 = V3.x - V1.x;
+            dy1 = V3.y - V1.y;
 
-                dx2 = V2.x - V3.x;
-                dy2 = V2.y - V3.y;
+            dx2 = V3.x - V2.x;
+            dy2 = V3.y - V2.y;
 
-                height_r = -dy1; // doesn't matter which since V1.y = V3.y
-                incx1 = dx1 / dy1;
-                incx2 = dx2 / dy2;
+            height_r = dy1; // doesn't matter which since V1.y = V3.y
+            incx1 = dx1 / dy1;
+            incx2 = dx2 / dy2;
 
-                y = V2.y;
-            } else if (drawing_mode == 3){
-                // select pair of active edges as V2V1 (1) and V2V3 (2).
-                dx1 = V3.x - V1.x;
-                dy1 = V3.y - V1.y;
+            y = V1.y;
 
-                dx2 = V3.x - V2.x;
-                dy2 = V3.y - V2.y;
-
-                height_r = dy1; // doesn't matter which since V1.y = V3.y
-                incx1 = dx1 / dy1;
-                incx2 = dx2 / dy2;
-
-                y = V2.y;
-            }
-
-            for(float n=0; n <= height_r; n-=1.0f){
-                if(V1.x <= V3.x){
-                    limit_left = V2.x + n * incx1;
+            for(float n=0; n >= height_r; n-=1.f){
+                if(V1.x <= V2.x){
+                    limit_left = V1.x + n * incx1;
                     limit_right = V2.x + n * incx2;
                 } else {
                     limit_left = V2.x + n * incx2;
-                    limit_right = V2.x + n * incx1;
+                    limit_right = V1.x + n * incx1;
                 }
 
                 // calculate colors and depths at the right/left limits (along the edges): 
@@ -805,18 +782,26 @@ public:
                     color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
-                    if (test_z_buffer(posx, posy, depth12)){
+                    if (test_z_buffer(posx, posy, depth12)) {
                         // z buffer test came back positive. pixel is visible.
                         if (shading_type == 1 || shading_type == 2)
                             set_to_color_buffer(posx, posy, color12);
                         else
                             set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                    }
 
-                        //set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                    //To draw only points
+                    if(drawing_mode == 1){
+                        break;
                     }
                 }
 
-                y -= 1.0f;
+                //To draw only points
+                if(drawing_mode == 1){
+                    break;
+                }
+
+                y -= 1.f;
 
             }
 
@@ -832,39 +817,22 @@ public:
                 set_to_color_buffer(V1.x, V1.y, V1_color);
             }
 
-            if(drawing_mode == 1 || drawing_mode == 2){
-                // select pair of active edges as V1V2 (1) and V1V3 (2).
-                dx1 = V2.x - V1.x;
-                dy1 = V2.y - V1.y;
+            // select pair of active edges as V1V2 (1) and V1V3 (2).
+            dx1 = V2.x - V1.x;
+            dy1 = V2.y - V1.y;
 
-                dx2 = V3.x - V1.x;
-                dy2 = V3.y - V1.y;
+            dx2 = V3.x - V1.x;
+            dy2 = V3.y - V1.y;
 
-                incx1 = dx1 / dy1;
-                incx2 = dx2 / dy2;
+            incx1 = dx1 / dy1;
+            incx2 = dx2 / dy2;
 
-                //V2 is always lower than V3.
-                height_r = dy2;
+            //V2 is always lower than V3.
+            height_r = dy1;
 
-                y = V1.y;
-            } else if (drawing_mode == 3){
-                // select pair of active edges as V1V2 (1) and V1V3 (2).
-                dx1 = V2.x - V1.x;
-                dy1 = V2.y - V1.y;
+            y = V1.y;
 
-                dx2 = V3.x - V1.x;
-                dy2 = V3.y - V1.y;
-
-                incx1 = dx1 / dy1;
-                incx2 = dx2 / dy2;
-
-                //V2 is always lower than V3.
-                height_r = dy1;
-
-                y = V1.y;
-            }
-
-            for (float n = 0; n <= height_r; n -= 1.0f){
+            for (float n = 0; n >= height_r; n -= 1.f){
 
                 if (V2.x <= V3.x){
 
@@ -897,57 +865,39 @@ public:
                             set_to_color_buffer(posx, posy, color12);
                         else
                             set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                    }
 
-                        //set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                    //To draw only points
+                    if(drawing_mode == 1){
+                        break;
                     }
 
                 }
 
-                y -= 1.0;
+                //To draw only points
+                if(drawing_mode == 1){
+                    break;
+                }
+
+                y -= 1.f;
             }
 
             // Second part of implementation of the most generic case
-            //Making V1 the same height that V2
-            V1.y = V2.y;
-
-            //Calculating difference in x axis
-            float w = ((V2.y - V1.y)*(V3.x - V1.x))/(V3.y - V1.y);
-
-            V1.x = V1.x + w;
-
-            if(drawing_mode == 1 || drawing_mode == 2){
-                // V2 is always the bottom vertex.
-                bottom = V2; bottomcolor = v2color;
-                if (V1.x >= V3.x){ 
-                    left = V3;
-                    leftcolor = v3color;
-                    right = V1;
-                    rightcolor = v1color;
-                } else { 
-                    left = V1;
-                    leftcolor = v1color;
-                    right = V3;
-                    rightcolor = v3color;
-                }
-
-                height_r = V3.y - V2.y;
-            } else if(drawing_mode == 3){
-
-                bottom = V3; bottomcolor = v3color;
-                if (V1.x >= V2.x){ 
-                    left = V2;
-                    leftcolor = v2color;
-                    right = V1;
-                    rightcolor = v1color;
-                } else { 
-                    left = V1;
-                    leftcolor = v1color;
-                    right = V2;
-                    rightcolor = v2color;
-                }
-
-                height_r = V3.y - V2.y;
+            // V2 is always the bottom vertex.
+            bottom = V3; bottomcolor = v3color;
+            if (V1.x >= V2.x){ 
+                left = V2;
+                leftcolor = v2color;
+                right = V1;
+                rightcolor = v1color;
+            } else { 
+                left = V1;
+                leftcolor = v1color;
+                right = V2;
+                rightcolor = v2color;
             }
+
+            height_r = V2.y - V3.y;
 
             // put first vertex in the color/z buffer.
             if (test_z_buffer(bottom.x, bottom.y, (float)bottom.z))
@@ -961,19 +911,19 @@ public:
             }
 
             // select pair of active edges as V2V1 (1) and V2V3 (2).
-            dx1 = bottom.x - left.x;
-            dy1 = bottom.y - left.y;
+            dx1 = left.x - bottom.x;
+            dy1 = left.y - bottom.y;
 
-            dx2 = bottom.x - right.x;
-            dy2 = bottom.y - right.y;
+            dx2 = right.x - bottom.x;
+            dy2 = right.y - bottom.y;
 
             incx1 = dx1 / dy1;
             incx2 = dx2 / dy2;
 
-            y = left.y;
+            y = bottom.y;
 
             // incrementing y one at a time, rasterize each line.
-            for (float n = 0; n <= height_r; n -= 1.0f) {
+            for (float n = 0; n <= height_r; n += 1.f) {
                 limit_left = bottom.x + n * incx1;
                 limit_right = bottom.x + n * incx2;
 
@@ -994,18 +944,25 @@ public:
                     depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
                     if (test_z_buffer(posx, posy, depth12)) {
-                        //cout<<"Generic case"<<endl;
                         // z buffer test came back positive. pixel is visible.
                         if (shading_type == 1 || shading_type == 2)
                             set_to_color_buffer(posx, posy, color12);
                         else
                             set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                    }
 
-                        //set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                    //To draw only points
+                    if(drawing_mode == 1){
+                        break;
                     }
 
                 }
-                y -= 1.0f;
+                y += 1.f;
+
+                //To draw only points
+                if(drawing_mode == 1){
+                    break;
+                }
             }
 
         }
