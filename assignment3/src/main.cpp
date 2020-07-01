@@ -494,20 +494,6 @@ public:
         light.specular.x = light.specular.y = light.specular.z = 1.0f;
 
         light.att[0] = 1.0f; light.att[1] = 0.0f; light.att[2] = 0.0f;
-
-        /*light.ambient[0] = light.mat.mat_ambient[1] = light.mat.mat_ambient[2] = g_LightMultiplier*0.2f;
-        light.mat.mat_ambient[3] = 1.0f;
-
-        light.mat.mat_diffuse[0] = light.mat.mat_diffuse[1] = light.mat.mat_diffuse[2] = g_LightMultiplier*0.8f;
-        light.mat.mat_diffuse[3] = 1.0f;
-
-        light.mat.mat_specular[0] = light.mat.mat_specular[1] = light.mat.mat_specular[2] = 1.0f;
-
-        light.att[0] = 1.0f;
-        light.att[1] = light.att[2] = 0.0f;
-
-        light.ambient[0] = light.ambient[1] = light.ambient[2] = 0.0f;
-        light.ambient[3] = 1.0f;*/
     }
 
     glm::vec3 phong_illumination_model(glm::vec4 v, glm::vec3 v_normal) {
@@ -709,10 +695,10 @@ public:
             } else if (drawing_mode == 3){
                 // select pair of active edges as V1V2 (1) and V1V3 (2).
                 dx1 = V2.x - V1.x;
-                dy1 = V1.y - V2.y;
+                dy1 = V2.y - V1.y;
 
                 dx2 = V3.x - V1.x;
-                dy2 = V1.y - V3.y;
+                dy2 = V3.y - V1.y;
 
                 height_r = dy1; // doesn't matter which since V2.y = V3.y
                 incx1 = dx1 / dy1;
@@ -722,7 +708,7 @@ public:
             }
 
             //Performing actual rasterization incrementing y one at a time.
-            for(float n=1; n <= height_r; n+=1.0f){
+            for(float n=0; n <= height_r; n-=1.0f){
                 limit_left = V1.x + n*incx1;
                 limit_right = V1.x + n*incx2;
 
@@ -782,20 +768,20 @@ public:
                 y = V2.y;
             } else if (drawing_mode == 3){
                 // select pair of active edges as V2V1 (1) and V2V3 (2).
-                dx1 = V2.x - V1.x;
-                dy1 = V2.y - V1.y;
+                dx1 = V3.x - V1.x;
+                dy1 = V3.y - V1.y;
 
-                dx2 = V2.x - V3.x;
-                dy2 = V2.y - V3.y;
+                dx2 = V3.x - V2.x;
+                dy2 = V3.y - V2.y;
 
-                height_r = -dy1; // doesn't matter which since V1.y = V3.y
+                height_r = dy1; // doesn't matter which since V1.y = V3.y
                 incx1 = dx1 / dy1;
                 incx2 = dx2 / dy2;
 
                 y = V2.y;
             }
 
-            for(float n=1; n <= height_r; n+=1.0f){
+            for(float n=0; n <= height_r; n-=1.0f){
                 if(V1.x <= V3.x){
                     limit_left = V2.x + n * incx1;
                     limit_right = V2.x + n * incx2;
@@ -830,7 +816,7 @@ public:
                     }
                 }
 
-                y += 1.0f;
+                y -= 1.0f;
 
             }
 
@@ -864,10 +850,10 @@ public:
             } else if (drawing_mode == 3){
                 // select pair of active edges as V1V2 (1) and V1V3 (2).
                 dx1 = V2.x - V1.x;
-                dy1 = V1.y - V2.y;
+                dy1 = V2.y - V1.y;
 
                 dx2 = V3.x - V1.x;
-                dy2 = V1.y - V3.y;
+                dy2 = V3.y - V1.y;
 
                 incx1 = dx1 / dy1;
                 incx2 = dx2 / dy2;
@@ -878,7 +864,7 @@ public:
                 y = V1.y;
             }
 
-            for (float n = 1; n <= height_r; n += 1.0f){
+            for (float n = 0; n <= height_r; n -= 1.0f){
 
                 if (V2.x <= V3.x){
 
@@ -921,6 +907,13 @@ public:
             }
 
             // Second part of implementation of the most generic case
+            //Making V1 the same height that V2
+            V1.y = V2.y;
+
+            //Calculating difference in x axis
+            float w = ((V2.y - V1.y)*(V3.x - V1.x))/(V3.y - V1.y);
+
+            V1.x = V1.x + w;
 
             if(drawing_mode == 1 || drawing_mode == 2){
                 // V2 is always the bottom vertex.
@@ -939,19 +932,6 @@ public:
 
                 height_r = V3.y - V2.y;
             } else if(drawing_mode == 3){
-                // V2 is always the bottom vertex.
-                /*bottom = V2; bottomcolor = v2color;
-                if (V1.x >= V3.x){ 
-                    left = V3;
-                    leftcolor = v3color;
-                    right = V1;
-                    rightcolor = v1color;
-                } else { 
-                    left = V1;
-                    leftcolor = v1color;
-                    right = V3;
-                    rightcolor = v3color;
-                }*/
 
                 bottom = V3; bottomcolor = v3color;
                 if (V1.x >= V2.x){ 
@@ -966,7 +946,7 @@ public:
                     rightcolor = v2color;
                 }
 
-                height_r = V2.y - V3.y;
+                height_r = V3.y - V2.y;
             }
 
             // put first vertex in the color/z buffer.
@@ -990,10 +970,10 @@ public:
             incx1 = dx1 / dy1;
             incx2 = dx2 / dy2;
 
-            y = bottom.y;
+            y = left.y;
 
             // incrementing y one at a time, rasterize each line.
-            for (float n = 1; n <= height_r; n += 1.0f) {
+            for (float n = 0; n <= height_r; n -= 1.0f) {
                 limit_left = bottom.x + n * incx1;
                 limit_right = bottom.x + n * incx2;
 
@@ -1025,7 +1005,7 @@ public:
                     }
 
                 }
-                y += 1.0f;
+                y -= 1.0f;
             }
 
         }
