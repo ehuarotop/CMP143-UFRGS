@@ -485,10 +485,6 @@ public:
         light.direction.z = -g_LightDirection[2];
         light.direction.w = 0.0f;
 
-        /*light.ambient = glm::vec4(g_ambient[0], 1.0f);
-        light.diffuse = glm::vec4(g_diffuse[0], 1.0f);
-        light.specular = glm::vec4(g_specular[0], 1.0f);*/
-
         light.ambient.x = light.ambient.y = light.ambient.z = g_LightMultiplier*0.2f;
         light.diffuse.x = light.diffuse.y = light.diffuse.z = g_LightMultiplier*0.8f;
         light.specular.x = light.specular.y = light.specular.z = 1.0f;
@@ -607,6 +603,77 @@ public:
         return (1-position)*z1 + position*z2;
     }
 
+    //to draw lines
+    void bresenham(int x1,int y1,int x2,int y2,RGBA_color average_color) {
+        int x,y,dx,dy,dx1,dy1,px,py,xe,ye,i;
+        dx=x2-x1;
+        dy=y2-y1;
+        dx1=fabs(dx);
+        dy1=fabs(dy);
+        px=2*dy1-dx1;
+        py=2*dx1-dy1;
+        
+        if(dy1<=dx1){
+            if(dx>=0){
+                x=x1;
+                y=y1;
+                xe=x2;
+            } else {
+                x=x2;
+                y=y2;
+                xe=x1;
+            }
+
+            set_to_color_buffer(x,y, average_color);
+            for(i=0;x<xe;i++){
+                x=x+1;
+                if(px<0){
+                    px=px+2*dy1;
+                } else {
+                    if((dx<0 && dy<0) || (dx>0 && dy>0)){
+                        y=y+1;
+                    }else{
+                        y=y-1;
+                    }
+                
+                px=px+2*(dy1-dx1);
+                }
+
+                set_to_color_buffer(x,y, average_color);
+            }
+        } else {
+            if(dy>=0) {
+                x=x1;
+                y=y1;
+                ye=y2;
+            } else {
+                x=x2;
+                y=y2;
+                ye=y1;
+            }
+            
+            set_to_color_buffer(x,y, average_color);
+            
+            for(i=0;y<ye;i++){
+                y=y+1;
+                
+                if(py<=0){
+                    py=py+2*dx1;
+                } else {
+                    if((dx<0 && dy<0) || (dx>0 && dy>0)) {
+                        x=x+1;
+                    } else {
+                        x=x-1;
+                    }
+                    
+                    py=py+2*(dx1-dy1);
+                }
+                
+                set_to_color_buffer(x,y, average_color);
+            }
+        }
+    }
+
     void rasterize_triangle(Triangle_c2gl t){
         glm::vec4 V1, V2, V3, left, right, bottom;
         bool inverted_triangle = false, upright_triangle = false;
@@ -668,203 +735,227 @@ public:
         //If is upright triangle
         if(upright_triangle){
 
-            if(test_z_buffer(V1.x, V1.y, (float)V1.z)){
-                RGBA_color V1_color;
-                V1_color.r = v1color[0];
-                V1_color.g = v1color[1];
-                V1_color.b = v1color[2];
-                V1_color.a = 1;
+            if(drawing_mode == 2){
+                bresenham(V1.x, V1.y, V2.x, V2.y, average_color(v1color, v2color, v3color));
+                bresenham(V1.x, V1.y, V3.x, V3.y, average_color(v1color, v2color, v3color));
+                bresenham(V2.x, V2.y, V3.x, V3.y, average_color(v1color, v2color, v3color));
+            } else {
+                if(test_z_buffer(V1.x, V1.y, (float)V1.z)){
+                    RGBA_color V1_color;
+                    V1_color.r = v1color[0];
+                    V1_color.g = v1color[1];
+                    V1_color.b = v1color[2];
+                    V1_color.a = 1;
 
-                set_to_color_buffer(V1.x, V1.y, V1_color);
-            }
+                    set_to_color_buffer(V1.x, V1.y, V1_color);
+                }
 
-            // select pair of active edges as V1V2 (1) and V1V3 (2).
-            dx1 = V2.x - V1.x;
-            dy1 = V2.y - V1.y;
+                // select pair of active edges as V1V2 (1) and V1V3 (2).
+                dx1 = V2.x - V1.x;
+                dy1 = V2.y - V1.y;
 
-            dx2 = V3.x - V1.x;
-            dy2 = V3.y - V1.y;
+                dx2 = V3.x - V1.x;
+                dy2 = V3.y - V1.y;
 
-            height_r = dy1; // doesn't matter which since V2.y = V3.y
-            incx1 = dx1 / dy1;
-            incx2 = dx2 / dy2;
+                height_r = dy1; // doesn't matter which since V2.y = V3.y
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
 
-            y = V1.y;
+                y = V1.y;
 
-            //Performing actual rasterization incrementing y one at a time.
-            for(float n=0; n >= height_r; n-=1.f){
-                limit_left = V1.x + n*incx1;
-                limit_right = V1.x + n*incx2;
+                //Performing actual rasterization incrementing y one at a time.
+                for(float n=0; n >= height_r; n-=1.f){
+                    limit_left = V1.x + n*incx1;
+                    limit_right = V1.x + n*incx2;
 
-                // calculate colors and depths at the right/left limits (along the edges): 
-                color1 = interpolate_colors(v2color, v1color, (float)(n / height_r));
-                color2 = interpolate_colors(v3color, v1color, (float)(n / height_r));
+                    // calculate colors and depths at the right/left limits (along the edges): 
+                    color1 = interpolate_colors(v2color, v1color, (float)(n / height_r));
+                    color2 = interpolate_colors(v3color, v1color, (float)(n / height_r));
 
-                depth1 = interpolate_depths(V2.z, V1.z, (float)(n / height_r));
-                depth2 = interpolate_depths(V3.z, V1.z, (float)(n / height_r));
+                    depth1 = interpolate_depths(V2.z, V1.z, (float)(n / height_r));
+                    depth2 = interpolate_depths(V3.z, V1.z, (float)(n / height_r));
 
-                for(int x = limit_left; x<=limit_right; x++){
-                    int posx = (int)round(x);
-                    int posy = (int)round(y);
+                    for(int x = limit_left; x<=limit_right; x++){
+                        int posx = (int)round(x);
+                        int posy = (int)round(y);
 
-                    // interpolate colors and depth between the lines set by V1V2 and V1V3
-                    color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
-                    depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+                        // interpolate colors and depth between the lines set by V1V2 and V1V3
+                        color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
+                        depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
-                    if (test_z_buffer(posx, posy, depth12)){
-                        // z buffer test came back positive. pixel is visible.
-                        if (shading_type == 1 || shading_type == 2)
-                            set_to_color_buffer(posx, posy, color12);
-                        else
-                            set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        if (test_z_buffer(posx, posy, depth12)){
+                            // z buffer test came back positive. pixel is visible.
+                            if (shading_type == 1 || shading_type == 2)
+                                set_to_color_buffer(posx, posy, color12);
+                            else
+                                set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        }
+
+                        //To draw only points
+                        if(drawing_mode == 1){
+                            break;
+                        }
                     }
 
                     //To draw only points
                     if(drawing_mode == 1){
                         break;
                     }
+
+                    y -= 1.f;
+
                 }
-
-                //To draw only points
-                if(drawing_mode == 1){
-                    break;
-                }
-
-                y -= 1.f;
-
             }
 
         } else if (inverted_triangle){
-            // put first vertex in the color/z buffer.
-            if (test_z_buffer(V2.x, V2.y, (float)V2.z)) {
-                RGBA_color V2color;
-                V2color.r = v2color[0];
-                V2color.g = v2color[1];
-                V2color.b = v2color[2];
-                V2color.a = 1;
-                set_to_color_buffer(V2.x, V2.y, V2color);
-            }
 
-            // select pair of active edges as V2V1 (1) and V2V3 (2).
-            dx1 = V3.x - V1.x;
-            dy1 = V3.y - V1.y;
-
-            dx2 = V3.x - V2.x;
-            dy2 = V3.y - V2.y;
-
-            height_r = dy1; // doesn't matter which since V1.y = V3.y
-            incx1 = dx1 / dy1;
-            incx2 = dx2 / dy2;
-
-            y = V1.y;
-
-            for(float n=0; n >= height_r; n-=1.f){
-                if(V1.x <= V2.x){
-                    limit_left = V1.x + n * incx1;
-                    limit_right = V2.x + n * incx2;
-                } else {
-                    limit_left = V2.x + n * incx2;
-                    limit_right = V1.x + n * incx1;
+            if(drawing_mode == 2){
+                bresenham(V1.x, V1.y, V2.x, V2.y, average_color(v1color, v2color, v3color));
+                bresenham(V1.x, V1.y, V3.x, V3.y, average_color(v1color, v2color, v3color));
+                bresenham(V2.x, V2.y, V3.x, V3.y, average_color(v1color, v2color, v3color));
+            } else {
+                // put first vertex in the color/z buffer.
+                if (test_z_buffer(V2.x, V2.y, (float)V2.z)) {
+                    RGBA_color V2color;
+                    V2color.r = v2color[0];
+                    V2color.g = v2color[1];
+                    V2color.b = v2color[2];
+                    V2color.a = 1;
+                    set_to_color_buffer(V2.x, V2.y, V2color);
                 }
 
-                // calculate colors and depths at the right/left limits (along the edges): 
-                color1 = interpolate_colors(v1color, v2color, (float)(n / height_r));
-                color2 = interpolate_colors(v3color, v2color, (float)(n / height_r));
+                // select pair of active edges as V2V1 (1) and V2V3 (2).
+                dx1 = V3.x - V1.x;
+                dy1 = V3.y - V1.y;
 
-                depth1 = interpolate_depths(V1.z, V2.z, (float)(n / height_r));
-                depth2 = interpolate_depths(V3.z, V2.z, (float)(n / height_r));
+                dx2 = V3.x - V2.x;
+                dy2 = V3.y - V2.y;
 
-                for(int x=limit_left; x<=limit_right; x++){
-                    int posx = (int)round(x);
-                    int posy = (int)round(y);
+                height_r = dy1; // doesn't matter which since V1.y = V3.y
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
 
-                    // interpolate colors and depth between the lines set by V1V2 and V1V3
-                    color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
-                    depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+                y = V1.y;
 
-                    if (test_z_buffer(posx, posy, depth12)) {
-                        // z buffer test came back positive. pixel is visible.
-                        if (shading_type == 1 || shading_type == 2)
-                            set_to_color_buffer(posx, posy, color12);
-                        else
-                            set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                for(float n=0; n >= height_r; n-=1.f){
+                    if(V1.x <= V2.x){
+                        limit_left = V1.x + n * incx1;
+                        limit_right = V2.x + n * incx2;
+                    } else {
+                        limit_left = V2.x + n * incx2;
+                        limit_right = V1.x + n * incx1;
+                    }
+
+                    // calculate colors and depths at the right/left limits (along the edges): 
+                    color1 = interpolate_colors(v1color, v2color, (float)(n / height_r));
+                    color2 = interpolate_colors(v3color, v2color, (float)(n / height_r));
+
+                    depth1 = interpolate_depths(V1.z, V2.z, (float)(n / height_r));
+                    depth2 = interpolate_depths(V3.z, V2.z, (float)(n / height_r));
+
+                    for(int x=limit_left; x<=limit_right; x++){
+                        int posx = (int)round(x);
+                        int posy = (int)round(y);
+
+                        // interpolate colors and depth between the lines set by V1V2 and V1V3
+                        color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
+                        depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+
+                        if (test_z_buffer(posx, posy, depth12)) {
+                            // z buffer test came back positive. pixel is visible.
+                            if (shading_type == 1 || shading_type == 2)
+                                set_to_color_buffer(posx, posy, color12);
+                            else
+                                set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        }
+
+                        //To draw only points
+                        if(drawing_mode == 1){
+                            break;
+                        }
                     }
 
                     //To draw only points
                     if(drawing_mode == 1){
                         break;
                     }
+
+                    y -= 1.f;
+
                 }
-
-                //To draw only points
-                if(drawing_mode == 1){
-                    break;
-                }
-
-                y -= 1.f;
-
             }
 
         } else{ //most generic case
+            if(drawing_mode == 2){
+                bresenham(V1.x, V1.y, V2.x, V2.y, average_color(v1color, v2color, v3color));
+                bresenham(V1.x, V1.y, V3.x, V3.y, average_color(v1color, v2color, v3color));
+                bresenham(V2.x, V2.y, V3.x, V3.y, average_color(v1color, v2color, v3color));
+            } else {
+                if(test_z_buffer(V1.x, V1.y, (float)V1.z)){
+                    RGBA_color V1_color;
+                    V1_color.r = v1color[0];
+                    V1_color.g = v1color[1];
+                    V1_color.b = v1color[2];
+                    V1_color.a = 1;
 
-            if(test_z_buffer(V1.x, V1.y, (float)V1.z)){
-                RGBA_color V1_color;
-                V1_color.r = v1color[0];
-                V1_color.g = v1color[1];
-                V1_color.b = v1color[2];
-                V1_color.a = 1;
-
-                set_to_color_buffer(V1.x, V1.y, V1_color);
-            }
-
-            // select pair of active edges as V1V2 (1) and V1V3 (2).
-            dx1 = V2.x - V1.x;
-            dy1 = V2.y - V1.y;
-
-            dx2 = V3.x - V1.x;
-            dy2 = V3.y - V1.y;
-
-            incx1 = dx1 / dy1;
-            incx2 = dx2 / dy2;
-
-            //V2 is always lower than V3.
-            height_r = dy1;
-
-            y = V1.y;
-
-            for (float n = 0; n >= height_r; n -= 1.f){
-
-                if (V2.x <= V3.x){
-
-                    limit_left = V1.x + n * incx1;
-                    limit_right = V1.x + n * incx2;
-                } else {
-                    
-                    limit_left = V1.x + n * incx2;
-                    limit_right = V1.x + n * incx1;
+                    set_to_color_buffer(V1.x, V1.y, V1_color);
                 }
 
-                // calculate colors and depths at the right/left limits (along the edges): 
-                color1 = interpolate_colors(v2color, v1color, (float)(n / height_r));
-                color2 = interpolate_colors(v3color, v1color, (float)(n / height_r));
+                // select pair of active edges as V1V2 (1) and V1V3 (2).
+                dx1 = V2.x - V1.x;
+                dy1 = V2.y - V1.y;
 
-                depth1 = interpolate_depths(V2.z, V1.z, (float)(n / height_r));
-                depth2 = interpolate_depths(V3.z, V1.z, (float)(n / height_r));
+                dx2 = V3.x - V1.x;
+                dy2 = V3.y - V1.y;
 
-                for (int x = limit_left; x <= limit_right; x++) {
-                    int posx = (int)round(x);
-                    int posy = (int)round(y);
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
 
-                    // interpolate colors and depth between the lines set by V1V2 and V1V3
-                    color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
-                    depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+                //V2 is always lower than V3.
+                height_r = dy1;
 
-                    if (test_z_buffer(posx, posy, depth12)) {
-                        // z buffer test came back positive. pixel is visible.
-                        if (shading_type == 1 || shading_type == 2)
-                            set_to_color_buffer(posx, posy, color12);
-                        else
-                            set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                y = V1.y;
+
+                for (float n = 0; n >= height_r; n -= 1.f){
+
+                    if (V2.x <= V3.x){
+
+                        limit_left = V1.x + n * incx1;
+                        limit_right = V1.x + n * incx2;
+                    } else {
+                        
+                        limit_left = V1.x + n * incx2;
+                        limit_right = V1.x + n * incx1;
+                    }
+
+                    // calculate colors and depths at the right/left limits (along the edges): 
+                    color1 = interpolate_colors(v2color, v1color, (float)(n / height_r));
+                    color2 = interpolate_colors(v3color, v1color, (float)(n / height_r));
+
+                    depth1 = interpolate_depths(V2.z, V1.z, (float)(n / height_r));
+                    depth2 = interpolate_depths(V3.z, V1.z, (float)(n / height_r));
+
+                    for (int x = limit_left; x <= limit_right; x++) {
+                        int posx = (int)round(x);
+                        int posy = (int)round(y);
+
+                        // interpolate colors and depth between the lines set by V1V2 and V1V3
+                        color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
+                        depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+
+                        if (test_z_buffer(posx, posy, depth12)) {
+                            // z buffer test came back positive. pixel is visible.
+                            if (shading_type == 1 || shading_type == 2)
+                                set_to_color_buffer(posx, posy, color12);
+                            else
+                                set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        }
+
+                        //To draw only points
+                        if(drawing_mode == 1){
+                            break;
+                        }
+
                     }
 
                     //To draw only points
@@ -872,96 +963,97 @@ public:
                         break;
                     }
 
+                    y -= 1.f;
+                }
+            }
+
+            
+            if(drawing_mode == 2){
+                bresenham(V1.x, V1.y, V2.x, V2.y, average_color(v1color, v2color, v3color));
+                bresenham(V1.x, V1.y, V3.x, V3.y, average_color(v1color, v2color, v3color));
+                bresenham(V2.x, V2.y, V3.x, V3.y, average_color(v1color, v2color, v3color));
+            } else {
+                // Second part of implementation of the most generic case
+                // V2 is always the bottom vertex.
+                bottom = V3; bottomcolor = v3color;
+                if (V1.x >= V2.x){ 
+                    left = V2;
+                    leftcolor = v2color;
+                    right = V1;
+                    rightcolor = v1color;
+                } else { 
+                    left = V1;
+                    leftcolor = v1color;
+                    right = V2;
+                    rightcolor = v2color;
                 }
 
-                //To draw only points
-                if(drawing_mode == 1){
-                    break;
+                height_r = V2.y - V3.y;
+
+                // put first vertex in the color/z buffer.
+                if (test_z_buffer(bottom.x, bottom.y, (float)bottom.z))
+                {
+                    RGBA_color V2color;
+                    V2color.r = bottomcolor[0];
+                    V2color.g = bottomcolor[1];
+                    V2color.b = bottomcolor[2];
+                    V2color.a = 1;
+                    set_to_color_buffer(bottom.x, bottom.y, V2color);
                 }
 
-                y -= 1.f;
-            }
+                // select pair of active edges as V2V1 (1) and V2V3 (2).
+                dx1 = left.x - bottom.x;
+                dy1 = left.y - bottom.y;
 
-            // Second part of implementation of the most generic case
-            // V2 is always the bottom vertex.
-            bottom = V3; bottomcolor = v3color;
-            if (V1.x >= V2.x){ 
-                left = V2;
-                leftcolor = v2color;
-                right = V1;
-                rightcolor = v1color;
-            } else { 
-                left = V1;
-                leftcolor = v1color;
-                right = V2;
-                rightcolor = v2color;
-            }
+                dx2 = right.x - bottom.x;
+                dy2 = right.y - bottom.y;
 
-            height_r = V2.y - V3.y;
+                incx1 = dx1 / dy1;
+                incx2 = dx2 / dy2;
 
-            // put first vertex in the color/z buffer.
-            if (test_z_buffer(bottom.x, bottom.y, (float)bottom.z))
-            {
-                RGBA_color V2color;
-                V2color.r = bottomcolor[0];
-                V2color.g = bottomcolor[1];
-                V2color.b = bottomcolor[2];
-                V2color.a = 1;
-                set_to_color_buffer(bottom.x, bottom.y, V2color);
-            }
+                y = bottom.y;
 
-            // select pair of active edges as V2V1 (1) and V2V3 (2).
-            dx1 = left.x - bottom.x;
-            dy1 = left.y - bottom.y;
-
-            dx2 = right.x - bottom.x;
-            dy2 = right.y - bottom.y;
-
-            incx1 = dx1 / dy1;
-            incx2 = dx2 / dy2;
-
-            y = bottom.y;
-
-            // incrementing y one at a time, rasterize each line.
-            for (float n = 0; n <= height_r; n += 1.f) {
-                limit_left = bottom.x + n * incx1;
-                limit_right = bottom.x + n * incx2;
+                // incrementing y one at a time, rasterize each line.
+                for (float n = 0; n <= height_r; n += 1.f) {
+                    limit_left = bottom.x + n * incx1;
+                    limit_right = bottom.x + n * incx2;
 
 
-                // calculate colors and depths at the right/left limits (along the edges): 
-                color1 = interpolate_colors(leftcolor, bottomcolor, (float)(n / height_r));
-                color2 = interpolate_colors(rightcolor, bottomcolor, (float)(n / height_r));
+                    // calculate colors and depths at the right/left limits (along the edges): 
+                    color1 = interpolate_colors(leftcolor, bottomcolor, (float)(n / height_r));
+                    color2 = interpolate_colors(rightcolor, bottomcolor, (float)(n / height_r));
 
-                depth1 = interpolate_depths(left.z, bottom.z, (float)(n / height_r));
-                depth2 = interpolate_depths(right.z, bottom.z, (float)(n / height_r));
+                    depth1 = interpolate_depths(left.z, bottom.z, (float)(n / height_r));
+                    depth2 = interpolate_depths(right.z, bottom.z, (float)(n / height_r));
 
-                for (int x = limit_left; x <= limit_right; x++) {
-                    int posx = (int)round(x);
-                    int posy = (int)round(y);
+                    for (int x = limit_left; x <= limit_right; x++) {
+                        int posx = (int)round(x);
+                        int posy = (int)round(y);
 
-                    // interpolate colors and depth between the lines set by V1V2 and V1V3
-                    color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
-                    depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
+                        // interpolate colors and depth between the lines set by V1V2 and V1V3
+                        color12 = interpolate_colors(color1, color2, (float)((x - limit_left) / (limit_right - limit_left)));
+                        depth12 = interpolate_depths(depth1, depth2, (float)((x - limit_left) / (limit_right - limit_left)));
 
-                    if (test_z_buffer(posx, posy, depth12)) {
-                        // z buffer test came back positive. pixel is visible.
-                        if (shading_type == 1 || shading_type == 2)
-                            set_to_color_buffer(posx, posy, color12);
-                        else
-                            set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        if (test_z_buffer(posx, posy, depth12)) {
+                            // z buffer test came back positive. pixel is visible.
+                            if (shading_type == 1 || shading_type == 2)
+                                set_to_color_buffer(posx, posy, color12);
+                            else
+                                set_to_color_buffer(posx, posy, average_color(v1color, v2color, v3color));
+                        }
+
+                        //To draw only points
+                        if(drawing_mode == 1){
+                            break;
+                        }
+
                     }
+                    y += 1.f;
 
                     //To draw only points
                     if(drawing_mode == 1){
                         break;
                     }
-
-                }
-                y += 1.f;
-
-                //To draw only points
-                if(drawing_mode == 1){
-                    break;
                 }
             }
 
@@ -1158,35 +1250,7 @@ public:
             // pass matrix uniform locations to the shaders
             glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));
 
-            /********************** HERE ENDS ASSIGNMENT 3 **********************************/            
-
-            // ---------------- Actual Drawing ---------------- //
-            //glEnable(GL_DEPTH_TEST);
-
-            /*if(drawing_mode == 1){
-                glDrawArrays(GL_POINTS, 0, clipped_triangles.size()*3);
-            } else if (drawing_mode == 2){
-                glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-                glDrawArrays(GL_TRIANGLES, 0, clipped_triangles.size()*3);
-                glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-            }
-            else if (drawing_mode == 3)
-                glDrawArrays(GL_TRIANGLES, 0, clipped_triangles.size()*3);
-
-            //glDisable(GL_DEPTH_TEST);
-
-            // ---------------- Actual Drawing ---------------- //
-
-
-            //Unbinding the VBO buffer
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-
-            // Passing only color as uniform to the fragment shader. Retrieving the matrix uniform locations
-            unsigned int colorLoc = glGetUniformLocation(custom_shader.ID, "rasterizer_color");
-
-            // pass matrix uniform locations to the shaders
-            glUniform4fv(colorLoc, 1, glm::value_ptr(this->color));*/
+            /********************** HERE ENDS ASSIGNMENT 3 **********************************/
 
         }
     }
@@ -1234,7 +1298,7 @@ public:
     MyTextBox *textBox_fp;
     MyTextBox *textBox_fpsrate;
 
-    App() : nanogui::Screen(Eigen::Vector2i(1250, 900), "Programming Assignment 1", false) {
+    App() : nanogui::Screen(Eigen::Vector2i(1250, 900), "Programming Assignment 3", false) {
         using namespace nanogui;
 
         // Printing to terminal opengl and glsl version
