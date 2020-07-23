@@ -1,204 +1,203 @@
-'''from OpenGL.GLUT import *
+import pygame as pg
+from pygame.locals import *
+
+from OpenGL.GL import *
+import OpenGL.GL.shaders
 from OpenGL.GLU import *
-from OpenGL.GL import *'''
 
-import OpenGL.GL as GL
-import OpenGL.GLU as GLU
-import OpenGL.GLUT as GLUT
-
-from array import array
+import glm
+from PIL import Image
 import numpy as np
 
 import utils
 
-window = 0 
-width, height = 1024,768
+#Size of the planes that will be drawn
+y_size = 0.15
+x_size = 0.05
 
-def draw():
-    GL.glClear(GL.GL_COLOR_BUFFER_BIT |GL.GL_DEPTH_BUFFER_BIT)           
-    GL.glLoadIdentity()
+VERTEX_SHADER = """
+ 
+              #version 330
+ 
+              in vec3 position;
+              in vec3 color;
+              in vec2 InTexCoords;
+ 
+              out vec3 newColor;
+              out vec2 OutTexCoords;
+              
+              uniform mat4 transform; 
+ 
+              void main() {
+ 
+                gl_Position = transform * vec4(position, 1.0f);
+               newColor = color;
+               OutTexCoords = InTexCoords;
+ 
+                }
+ 
+ 
+          """
+ 
+FRAGMENT_SHADER = """
+       #version 330
 
-    '''glBegin(GL_TRIANGLE_STRIP);
-    glColor4f(0.8, 0.8, 0.5, 1.0);
-    glVertex3f(startlen, height, startwid);    
-    glVertex3f(startlen, height, startwid + width);
-    glVertex3f(startlen + length, height, startwid);
-    glVertex3f(startlen + length, height, startwid + width);
-    glEnd();'''
+        in vec3 newColor;
+        in vec2 OutTexCoords;
 
+        out vec4 outColor;
+        uniform sampler2D samplerTex;
 
-    GLUT.glutSwapBuffers()
+       void main() {
+
+          outColor = texture(samplerTex, OutTexCoords);
+
+       }
+
+   """
+
+def drawRectangle(image, shader):
+    filename = image[0]
+    position = image[1]
+
+                            ########### position ############## ,          #######color#####    #texture#
+                    #first triangle
+    vertex_info = [ position[0]-x_size, position[1]-y_size, position[2],    1.0, 0.0, 0.0,      0.0, 0.0,
+                    position[0]-x_size, position[1]+y_size, position[2],    1.0, 0.0, 1.0,      0.0, 1.0,
+                    position[0]+x_size, position[1]+y_size, position[2],    1.0, 0.0, 1.0,      1.0, 1.0,
+                    #second triangle
+                    position[0]-x_size, position[1]-y_size, position[2],    1.0, 0.0, 0.0,      0.0, 0.0,
+                    position[0]+x_size, position[1]+y_size, position[2],    1.0, 0.0, 1.0,      1.0, 1.0,
+                    position[0]+x_size, position[1]-y_size, position[2],    1.0, 0.0, 1.0,      1.0, 0.0]
+
+    #Converting vertex info into a numpy array
+    vertex_info = np.array(vertex_info, dtype=np.float32)
+
+    #Creating buffer in GPU
+    VBO = glGenBuffers(1)
+    #Binding the buffer
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)
+    glBufferData(GL_ARRAY_BUFFER, vertex_info.itemsize * len(vertex_info), vertex_info, GL_STATIC_DRAW)
+
+    # get the position from  shader
+    position = glGetAttribLocation(shader, 'position')
+    glVertexAttribPointer(position, 3, GL_FLOAT, GL_FALSE, vertex_info.itemsize * 8, ctypes.c_void_p(0))
+    glEnableVertexAttribArray(position)
+
+    # get the color from  shader
+    color = glGetAttribLocation(shader, 'color')
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_info.itemsize * 8, ctypes.c_void_p(12))
+    glEnableVertexAttribArray(1)
+
+    texCoords = glGetAttribLocation(shader, "InTexCoords")
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, vertex_info.itemsize * 8, ctypes.c_void_p(24))
+    glEnableVertexAttribArray(2)
+
+    #Texture Creation
+    texture = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, texture)
+    # Set the texture wrapping parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+    # Set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    # load image
+    image = Image.open(filename)
+    #resizing image to 
+    image.thumbnail((100,100))
+    img_data = np.array(list(image.getdata()), np.uint8)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data)
+    glEnable(GL_TEXTURE_2D)
+
 
 def main():
-
-    #Getting image positions
+    #Getting image positions from pre-calculated CSV
     img_positions = utils.get_img_positions_from_csv("dataset/Features/positions_all_features.csv")
 
-    GLUT.glutInit();
-    GLUT.glutInitDisplayMode(GLUT.GLUT_RGBA | GLUT.GLUT_DOUBLE | GLUT.GLUT_ALPHA |
-    GLUT.GLUT_DEPTH)
-    GLUT.glutInitWindowSize(width,height)
-    GLUT.glutInitWindowPosition(0,0)
-    window = GLUT.glutCreateWindow("CMP143 - Final Project - Felix Eduardo Huaroto Pachas")
-    GLUT.glutDisplayFunc(draw)                                                                       
-    GLUT.glutIdleFunc(draw)  
-    GLUT.glutMainLoop()
+    img_positions = img_positions[:100]
+
+    pg.init()
+    display = (900, 600)
+    pg.display.set_mode(display, DOUBLEBUF|OPENGL)
+
+    # Compiling shaders and program
+    shader = OpenGL.GL.shaders.compileProgram(OpenGL.GL.shaders.compileShader(VERTEX_SHADER, GL_VERTEX_SHADER),
+                                              OpenGL.GL.shaders.compileShader(FRAGMENT_SHADER, GL_FRAGMENT_SHADER))
+
+    glUseProgram(shader)
+
+    glEnable(GL_DEPTH_TEST)
+
+    #gluPerspective(45, (display[0]/display[1]), 0.1, 50.0)
+
+    glTranslatef(0.0, 0.0, -5)
+
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_LEFT:
+                    glTranslatef(-0.1,0,0)
+                if event.key == pg.K_RIGHT:
+                    glTranslatef(0.1,0,0)
+
+                if event.key == pg.K_UP:
+                    glTranslatef(0,1,0)
+                if event.key == pg.K_DOWN:
+                    glTranslatef(0,-1,0)
+
+            if event.type == pg.MOUSEBUTTONDOWN:
+                if event.button == 4:
+                    glTranslatef(0,0,1.0)
+
+                if event.button == 5:
+                    glTranslatef(0,0,-1.0)
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        transformLoc = glGetUniformLocation(shader, "transform")
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, np.identity(4))
+
+        #Draw image planes
+        for image in img_positions:
+            drawRectangle(image, shader)
+            #Actual Drawing elements
+            #glDrawElements(GL_TRIANGLES, 24, GL_UNSIGNED_INT, None)
+            glDrawArrays(GL_TRIANGLES, 0, 6)
+
+        pg.display.flip()
+        pg.time.wait(10)
 
 if __name__ == "__main__":
     main()
 
 
-#from framework import *
-
-# A 1-D array of 3 4-D vertices (X,Y,Z,W)
-# Note that this must be a numpy array, since as of 
-# 170111 support for lists has not been implemented.
-'''vertexPositions = np.array(
-    [0.75, 0.75, 0.0, 1.0,
-    0.75, -0.75, 0.0, 1.0, 
-    -0.75, -0.75, 0.0, 1.0],
-    dtype='float32'
-)
-
-vertexDim = 4
-nVertices = 3
-
-# Function that creates and compiles shaders according to the given type (a GL enum value) and 
-# shader program (a string containing a GLSL program).
-def createShader(shaderType, shaderFile):
-    shader = glCreateShader(shaderType)
-    glShaderSource(shader, shaderFile) # note that this is a simpler function call than in C
-    
-    glCompileShader(shader)
-    
-    status = None
-    glGetShaderiv(shader, GL_COMPILE_STATUS, status)
-    if status == GL_FALSE:
-        # Note that getting the error log is much simpler in Python than in C/C++
-        # and does not require explicit handling of the string buffer
-        strInfoLog = glGetShaderInforLog(shader)
-        strShaderType = ""
-        if shaderType is GL_VERTEX_SHADER:
-            strShaderType = "vertex"
-        elif shaderType is GL_GEOMETRY_SHADER:
-            strShaderType = "geometry"
-        elif shaderType is GL_FRAGMENT_SHADER:
-            strShaderType = "fragment"
-        
-        print("Compilation failure for " + strShaderType + " shader:\n" + strInfoLog)
-    
-    return shader
-
-# String containing vertex shader program written in GLSL
-strVertexShader = """
-#version 330
-layout(location = 0) in vec4 position;
-void main()
-{
-   gl_Position = position;
-}
-"""
-
-# String containing fragment shader program written in GLSL
-strFragmentShader = """
-#version 330
-out vec4 outputColor;
-void main()
-{
-   outputColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
-}
-"""
-
-# Global variable to represent the compiled shader program, written in GLSL
-theProgram = None
-
-# Global variable to represent the buffer that will hold the position vectors
-positionBufferObject = None
 
 
 
-# Set up the list of shaders, and call functions to compile them
-def initializeProgram():
-    shaderList = []
-    
-    shaderList.append(createShader(GL_VERTEX_SHADER, strVertexShader))
-    shaderList.append(createShader(GL_FRAGMENT_SHADER, strFragmentShader))
-    
-    global theProgram 
-    theProgram = createProgram(shaderList)
-    
-    for shader in shaderList:
-        glDeleteShader(shader)
 
-# Set up the vertex buffer that will store our vertex coordinates for OpenGL's access
-def initializeVertexBuffer():
-    global positionBufferObject
-    positionBufferObject = glGenBuffers(1)
-    
-    glBindBuffer(GL_ARRAY_BUFFER, positionBufferObject)
-    glBufferData( # PyOpenGL allows for the omission of the size parameter
-        GL_ARRAY_BUFFER,
-        vertexPositions,
-        GL_STATIC_DRAW
-    )
-    glBindBuffer(GL_ARRAY_BUFFER, 0)
 
-# Initialize the OpenGL environment
-def init():
-    initializeProgram()
-    initializeVertexBuffer()
-    glBindVertexArray(glGenVertexArrays(1))
 
-# Called to update the display. 
-# Because we are using double-buffering, glutSwapBuffers is called at the end
-# to write the rendered buffer to the display.
-def display():
-    glClearColor(0.0, 0.0, 0.0, 0.0)
-    glClear(GL_COLOR_BUFFER_BIT)
-    
-    glUseProgram(theProgram)
-    
-    glBindBuffer(GL_ARRAY_BUFFER, positionBufferObject)
-    glEnableVertexAttribArray(0)
-    glVertexAttribPointer(0, vertexDim, GL_FLOAT, GL_FALSE, 0, None)
-    
-    glDrawArrays(GL_TRIANGLES, 0, nVertices)
-    
-    glDisableVertexAttribArray(0)
-    glUseProgram(0)
-    
-    glutSwapBuffers()
 
-# keyboard input handler: exits the program if 'esc' is pressed
-def keyboard(key, x, y):
-    if ord(key) == 27: # ord() is needed to get the keycode
-        glutLeaveMainLoop()
-        return
-    
-# Called whenever the window's size changes (including once when the program starts)
-def reshape(w, h):
-    glViewport(0, 0, w, h)
 
-# The main function
-def main():
-    glutInit()
-    displayMode = GLUT_DOUBLE | GLUT_ALPHA | GLUT_DEPTH | GLUT_STENCIL;
-    glutInitDisplayMode (displayMode)
-    
-    width = 500;
-    height = 500;
-    glutInitWindowSize (width, height)
-    
-    glutInitWindowPosition (300, 200)
-    
-    window = glutCreateWindow("Triangle Window: Tut1")
-    
-    init()
-    glutDisplayFunc(display) 
-    glutReshapeFunc(reshape)
-    glutKeyboardFunc(keyboard)
-    
-    glutMainLoop();    
 
-if __name__ == '__main__':
-    main()'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+#################### useful URL ####################
+#http://pyopengl.sourceforge.net/context/tutorials/shader_1.html
+#https://codeloop.org/python-modern-opengl-texturing-rotating-cube/
