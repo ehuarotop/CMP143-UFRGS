@@ -5,58 +5,57 @@ from OpenGL.GL import *
 import OpenGL.GL.shaders
 from OpenGL.GLU import *
 
-import glm
+#import glm
 from PIL import Image
 import numpy as np
-
 import utils
+from camera import Camera
+from pyrr import Vector3,Vector4,Matrix33,Matrix44, Quaternion, matrix44
 
 #Size of the planes that will be drawn
-y_size = 0.15
-x_size = 0.05
+y_size = 0.30
+x_size = 0.15
+
+img_thumb_size = 128,128
 
 VERTEX_SHADER = """
  
-              #version 330
- 
-              in vec3 position;
-              in vec3 color;
-              in vec2 InTexCoords;
- 
-              out vec3 newColor;
-              out vec2 OutTexCoords;
-              
-              uniform mat4 transform; 
- 
-              void main() {
- 
-                gl_Position = transform * vec4(position, 1.0f);
-               newColor = color;
-               OutTexCoords = InTexCoords;
- 
+                #version 330
+
+                in vec3 position;
+                in vec3 color;
+                in vec2 InTexCoords;
+
+                out vec3 newColor;
+                out vec2 OutTexCoords;
+
+                uniform mat4 transform; 
+
+                void main() {
+                    gl_Position = transform * vec4(position, 1.0f);
+                    newColor = color;
+                    OutTexCoords = InTexCoords;
                 }
  
  
           """
  
 FRAGMENT_SHADER = """
-       #version 330
+                #version 330
 
-        in vec3 newColor;
-        in vec2 OutTexCoords;
+                in vec3 newColor;
+                in vec2 OutTexCoords;
 
-        out vec4 outColor;
-        uniform sampler2D samplerTex;
+                out vec4 outColor;
+                uniform sampler2D samplerTex;
 
-       void main() {
-
-          outColor = texture(samplerTex, OutTexCoords);
-
-       }
+                void main() {
+                    outColor = texture(samplerTex, OutTexCoords);
+                }
 
    """
 
-def drawRectangle(image, shader):
+def drawImage(image, shader):
     filename = image[0]
     position = image[1]
 
@@ -105,18 +104,19 @@ def drawRectangle(image, shader):
     # load image
     image = Image.open(filename)
     #resizing image to 
-    image.thumbnail((100,100))
+    image.thumbnail(img_thumb_size, Image.ANTIALIAS)
     img_data = np.array(list(image.getdata()), np.uint8)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data)
     glEnable(GL_TEXTURE_2D)
+
+    glDrawArrays(GL_TRIANGLES, 0, 6)
 
 
 def main():
     #Getting image positions from pre-calculated CSV
     img_positions = utils.get_img_positions_from_csv("dataset/Features/positions_all_features.csv")
 
-    img_positions = img_positions[:100]
-
+    #Initializing pygame
     pg.init()
     display = (900, 600)
     pg.display.set_mode(display, DOUBLEBUF|OPENGL)
@@ -125,13 +125,26 @@ def main():
     shader = OpenGL.GL.shaders.compileProgram(OpenGL.GL.shaders.compileShader(VERTEX_SHADER, GL_VERTEX_SHADER),
                                               OpenGL.GL.shaders.compileShader(FRAGMENT_SHADER, GL_FRAGMENT_SHADER))
 
+    #Using program based on loaded shaders
     glUseProgram(shader)
 
+    #Enabling DEPTH_TEST
     glEnable(GL_DEPTH_TEST)
 
-    #gluPerspective(45, (display[0]/display[1]), 0.1, 50.0)
+    #Initializing variables to control movement
+    tx = 0
+    ty = 0
+    tz = 0
+    ry = 0
+    lastX = 0
+    lastY = 0
+    firstMouse = True
+    movement = 0.01
+    yaw = 0.0
+    pitch = 0.0
 
-    glTranslatef(0.0, 0.0, -5)
+    #Initialize camera
+    camera = Camera()
 
     while True:
         for event in pg.event.get():
@@ -139,35 +152,68 @@ def main():
                 pg.quit()
                 quit()
 
+            """Controlling movements (LEFT, RIGHT, UP, DOWN)"""
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_LEFT:
-                    glTranslatef(-0.1,0,0)
-                if event.key == pg.K_RIGHT:
-                    glTranslatef(0.1,0,0)
+                    tx -= movement
+                elif event.key == pg.K_RIGHT:
+                    tx += movement
+                elif event.key == pg.K_UP:
+                    ty += movement
+                elif event.key == pg.K_DOWN:
+                    ty -= movement
 
-                if event.key == pg.K_UP:
-                    glTranslatef(0,1,0)
-                if event.key == pg.K_DOWN:
-                    glTranslatef(0,-1,0)
-
+            """Controlling movements (scrollup 4, scrolldown 5)"""
             if event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 4:
-                    glTranslatef(0,0,1.0)
+                    tz = movement
+                elif event.button == 5:
+                    tz = -movement
 
-                if event.button == 5:
-                    glTranslatef(0,0,-1.0)
+            """Controlling rotation"""
+            if event.type == pg.MOUSEMOTION:
+                if firstMouse:
+                    lastX = event.pos[0]
+                    lastY = event.pos[1]
+                    firstMouse = False
+
+                xoffset = event.pos[0] - lastX
+                yoffset = event.pos[1] - lastY
+                lastX = event.pos[0]
+                lastY = event.pos[1]
+
+                sensitivity = 0.2
+                xoffset *= sensitivity
+                yoffset *= sensitivity
+
+                yaw += xoffset
+                pitch += yoffset
+
+                if pitch > 89.0:
+                    pitch = 89.0
+                if pitch < -89.0:
+                    pitch = -89.0
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        #Applying translation
+        view = Matrix44.identity()
+        view = view * Matrix44.from_translation(Vector3([tx, ty, tz]))
+        view = view * Quaternion.from_x_rotation(pitch * (np.pi)/180.0) #We can multiply matrices and Quaternions directly.
+        view = view * Quaternion.from_y_rotation(yaw * (np.pi)/180.0)
+
+        #proj = matrix44.create_perspective_projection_matrix(60.0, display[1]/display[0], 0.1, 100.0)
+
         transformLoc = glGetUniformLocation(shader, "transform")
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, np.identity(4))
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, view)
+
+        #Getting only the top 50 images near to the current z
+        img_positions.sort(key=lambda x: np.abs(x[1][2]-tz))
+        current_imgs = img_positions[:10]
 
         #Draw image planes
-        for image in img_positions:
-            drawRectangle(image, shader)
-            #Actual Drawing elements
-            #glDrawElements(GL_TRIANGLES, 24, GL_UNSIGNED_INT, None)
-            glDrawArrays(GL_TRIANGLES, 0, 6)
+        for image in current_imgs:
+            drawImage(image, shader)
 
         pg.display.flip()
         pg.time.wait(10)
