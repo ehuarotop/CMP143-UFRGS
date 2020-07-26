@@ -144,7 +144,7 @@ def main():
     pitch = 0.0
 
     #Initialize camera
-    camera = Camera()
+    #camera = Camera()
 
     while True:
         for event in pg.event.get():
@@ -166,9 +166,9 @@ def main():
             """Controlling movements (scrollup 4, scrolldown 5)"""
             if event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 4:
-                    tz = movement
+                    tz += movement
                 elif event.button == 5:
-                    tz = -movement
+                    tz -= movement
 
             """Controlling rotation"""
             if event.type == pg.MOUSEMOTION:
@@ -194,22 +194,30 @@ def main():
                 if pitch < -89.0:
                     pitch = -89.0
 
+        print(tx, ty, tz)
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         #Applying translation
         view = Matrix44.identity()
+        #view = Matrix44.from_translation(Vector3([0.0,0.0, 0.5]))
         view = view * Matrix44.from_translation(Vector3([tx, ty, tz]))
         view = view * Quaternion.from_x_rotation(pitch * (np.pi)/180.0) #We can multiply matrices and Quaternions directly.
         view = view * Quaternion.from_y_rotation(yaw * (np.pi)/180.0)
+        #print(view)
+        #print("---------------------------------")
 
-        #proj = matrix44.create_perspective_projection_matrix(60.0, display[1]/display[0], 0.1, 100.0)
+        proj = matrix44.create_perspective_projection_matrix(45.0, float(display[0])/float(display[1]), 0.1, 100.0)
+
+        #print(proj)
+        #print("*********************************")
 
         transformLoc = glGetUniformLocation(shader, "transform")
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, view)
 
         #Getting only the top 50 images near to the current z
         img_positions.sort(key=lambda x: np.abs(x[1][2]-tz))
-        current_imgs = img_positions[:10]
+        current_imgs = img_positions[:5]
 
         #Draw image planes
         for image in current_imgs:

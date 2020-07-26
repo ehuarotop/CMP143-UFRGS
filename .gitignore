@@ -1,5 +1,7 @@
 bin/
 final/include/
+final/cpp/dataset/
+final/cpp/include/
 lib/
 lib64/
 share/
