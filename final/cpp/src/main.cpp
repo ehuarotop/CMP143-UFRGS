@@ -69,7 +69,9 @@ struct image {
     glm::vec3 position;
 };
 
+//Function declaration
 vector<image> readCSV(const char* filename);
+bool replace(std::string& str, const std::string& from, const std::string& to);
 
 //global variables used to control camera
 Camera camera = Camera(glm::vec3(0.0f, 0.0f, 5.0f));
@@ -160,18 +162,13 @@ public:
         unsigned char *data = stbi_load((string("./../") + string(img.path)).c_str(), &width, &height, &nrChannels, 0);
         if (data)
         {   
-            cout<<(string("./../") + string(img.path)).c_str()<<endl;
-            cout<<width<<" "<<height<<" "<<nrChannels<<endl;
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-            cout<<"primero llegue aqui"<<endl;
             glGenerateMipmap(GL_TEXTURE_2D);
-            cout<<"llegue aqui"<<endl;
         }   
         else
         {
             std::cout << "Failed to load texture" << std::endl;
             cout<<stbi_failure_reason()<<endl;
-            cout<<(string("./../") + string(img.path)).c_str()<<endl;
         }
         stbi_image_free(data);
 
@@ -394,6 +391,10 @@ vector<image> readCSV(const char* filename){
             if(num_line != 0){
                 switch(num_value){
                     case 0:
+                        //cout<<line_value.substr(line_value.find_last_of("."))<<endl;
+                        if(line_value.substr(line_value.find_last_of(".")) == ".png"){
+                            replace(line_value, ".png", ".jpg");
+                        }
                         current_image.path = line_value;
                         break;
                     case 1:
@@ -413,12 +414,20 @@ vector<image> readCSV(const char* filename){
 
         images.push_back(current_image);
 
-        if(num_line >= 5){
+        /*if(num_line >= 50){
             break;
-        }
+        }*/
 
         num_line += 1;
     }
 
     return images;
+}
+
+bool replace(std::string& str, const std::string& from, const std::string& to) {
+    size_t start_pos = str.find(from);
+    if(start_pos == std::string::npos)
+        return false;
+    str.replace(start_pos, from.length(), to);
+    return true;
 }
