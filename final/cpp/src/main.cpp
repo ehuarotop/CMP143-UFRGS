@@ -72,7 +72,7 @@ struct image {
 vector<image> readCSV(const char* filename);
 
 //global variables used to control camera
-Camera camera = Camera(glm::vec3(0.0f, 0.0f, 10.0f));
+Camera camera = Camera(glm::vec3(0.0f, 0.0f, 5.0f));
 float lastX = WINDOW_WIDTH / 2.0f;
 float lastY = WINDOW_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -92,8 +92,6 @@ public:
         for(int i=0; i<images.size(); i++){
             drawImage(images[i]);
         }
-
-        cout<<textures.size()<<endl;
 
         //Loading the shader program
         custom_shader.use();
@@ -156,15 +154,24 @@ public:
         // load image, create texture and generate mipmaps
         int width, height, nrChannels;
         stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
-        unsigned char *data = stbi_load("/home/ehuarotop/Documents/Computer_Science/UFRGS/CMP143/trabalhos/final/cpp/src/sha1-1b2196da2c51242134eb1a0999b7b7599c97a92a.jpg", &width, &height, &nrChannels, 0);
+        //"/home/ehuarotop/Documents/Computer_Science/UFRGS/CMP143/trabalhos/final/cpp/src/sha1-1b2196da2c51242134eb1a0999b7b7599c97a92a.jpg"
+        //./../src/sha1-1b2196da2c51242134eb1a0999b7b7599c97a92a.jpg"
+        //"./../dataset/Images/map/sha1-21372b0ef040de3db2321c57e88fb6cde0eb60b3.jpg"
+        unsigned char *data = stbi_load((string("./../") + string(img.path)).c_str(), &width, &height, &nrChannels, 0);
         if (data)
-        {
+        {   
+            cout<<(string("./../") + string(img.path)).c_str()<<endl;
+            cout<<width<<" "<<height<<" "<<nrChannels<<endl;
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            cout<<"primero llegue aqui"<<endl;
             glGenerateMipmap(GL_TEXTURE_2D);
-        }
+            cout<<"llegue aqui"<<endl;
+        }   
         else
         {
             std::cout << "Failed to load texture" << std::endl;
+            cout<<stbi_failure_reason()<<endl;
+            cout<<(string("./../") + string(img.path)).c_str()<<endl;
         }
         stbi_image_free(data);
 
@@ -406,9 +413,9 @@ vector<image> readCSV(const char* filename){
 
         images.push_back(current_image);
 
-        /*if(num_line >= 5){
+        if(num_line >= 5){
             break;
-        }*/
+        }
 
         num_line += 1;
     }
