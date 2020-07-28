@@ -12,6 +12,9 @@
     #endif
 #endif
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 //NANOGUI includes
 #include <nanogui/opengl.h>
 #include <nanogui/glutil.h>
@@ -37,7 +40,6 @@
 #include <nanogui/tabwidget.h>
 #include <nanogui/glcanvas.h>
 #include <nanogui/nanogui.h>
-
 //Includes for matrix transformations using glm
 #include <glm/vec3.hpp> // glm::vec3
 #include <glm/vec4.hpp> // glm::vec4
@@ -46,14 +48,13 @@
 #include <glm/gtc/type_ptr.hpp>
 //to print vectors and matrices
 #include <glm/gtx/string_cast.hpp>
-
 #include <shader_s.h>
 #include <camera.h>
-
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <stdlib.h>
 
 using namespace std;
 using namespace nanogui;
@@ -62,33 +63,162 @@ using namespace nanogui;
 int WINDOW_WIDTH=600;
 int WINDOW_HEIGHT=600;
 
+//Defining struct for triangle (close2gl)
+struct image {
+    string path;
+    glm::vec3 position;
+};
+
+vector<image> readCSV(const char* filename);
+
+//global variables used to control camera
+Camera camera = Camera(glm::vec3(0.0f, 0.0f, 10.0f));
+float lastX = WINDOW_WIDTH / 2.0f;
+float lastY = WINDOW_HEIGHT / 2.0f;
+bool firstMouse = true;
+
+float deltaTime = 0.0f; // time between current frame and last frame
+float lastFrame = 0.0f;
 
 ///////////////////////////////// CANVAS DECLARATION OPENGL /////////////////////////////////
 class MyGLCanvas : public GLCanvas{
 public:
-    //what model is being rendered at the moment (0:none, 1:cube, 2:cow)
-    int model_used;
-    //Camera camera = Camera();
 
     MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), custom_shader("../src/shader_vertex.glsl", "../src/shader_fragment.glsl"){
-
         //Reading file with the information corresponding to the cube
+        images = readCSV("../dataset/Features/position_features.csv");
+
+        //Generating VAOs for each image
+        for(int i=0; i<images.size(); i++){
+            drawImage(images[i]);
+        }
+
+        cout<<textures.size()<<endl;
+
+        //Loading the shader program
         custom_shader.use();
+    }
+
+    void drawImage(image img){
+        unsigned int VAO, VBO, EBO;
+
+        float vertices[] = {
+            img.position.x + x_size, img.position.y + y_size, img.position.z, 1.0f, 1.0f, // top right
+            img.position.x + x_size, img.position.y - y_size, img.position.z, 1.0f, 0.0f, // bottom right
+            img.position.x - x_size, img.position.y - y_size, img.position.z, 0.0f, 0.0f, // bottom left
+            img.position.x - x_size, img.position.y + y_size, img.position.z, 0.0f, 0.1f// top left 
+        };
+        
+        unsigned int indices[] = {
+            0, 1, 3,  // first Triangle
+            1, 2, 3   // second Triangle
+        };
+    
+        //unsigned int VBO, VAO, EBO;
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO);
+        // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+        glBindVertexArray(VAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+        //Vertexs
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        //Texture coordinates
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+
+        // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
+        glBindBuffer(GL_ARRAY_BUFFER, 0); 
+        //Unbinding VAO
+        glBindVertexArray(0);
+
+        vaos.push_back(VAO);
+
+        unsigned int texture1;
+        // texture 1
+        // ---------
+        glGenTextures(1, &texture1);
+        glBindTexture(GL_TEXTURE_2D, texture1);
+        // set the texture wrapping parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        // set texture filtering parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // load image, create texture and generate mipmaps
+        int width, height, nrChannels;
+        stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
+        unsigned char *data = stbi_load("/home/ehuarotop/Documents/Computer_Science/UFRGS/CMP143/trabalhos/final/cpp/src/sha1-1b2196da2c51242134eb1a0999b7b7599c97a92a.jpg", &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        else
+        {
+            std::cout << "Failed to load texture" << std::endl;
+        }
+        stbi_image_free(data);
+
+        //Storing textures
+        textures.push_back(texture1);
+
     }
 
     virtual void drawGL() override {
 
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-        
+
         //Loading the shader program
         custom_shader.use();
 
-        //create transformations
-        glm::mat4 model         = glm::mat4(1.0f);
-        glm::mat4 view          = glm::mat4(1.0f);
-        glm::mat4 projection    = glm::mat4(1.0f);
-        
+        //Enabling depth test
+        glEnable(GL_DEPTH_TEST);
+
+        // pass projection matrix to shader (note that in this case it could change every frame)
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.1f, 100.0f);
+
+        // camera/view transformation
+        glm::mat4 view = camera.GetViewMatrix();
+
+        for(int i=0; i<vaos.size(); i++){
+            glm::mat4 model = glm::mat4(1.0f);
+            //Passing model, view and projection matrix to the vertex shader
+            unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
+            unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
+            unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
+            unsigned int textureLoc = glGetUniformLocation(custom_shader.ID, "texture1");
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+            glUniform1i(textureLoc, 0);
+
+            //Activating textures
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, textures[i]);
+
+            //Binding VAOs
+            glBindVertexArray(vaos[i]);
+            //Actual drawing
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            //Unbinding VAOs
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            glBindVertexArray(0); 
+        }
+
         glDisable(GL_DEPTH_TEST);
 
     }
@@ -96,6 +226,11 @@ public:
 private:
     unsigned int VAO;
     CustomShader custom_shader;
+    vector<image> images;
+    vector<int> vaos;
+    vector<int> textures;
+    float x_size = 0.15f;
+    float y_size = 0.3f;
 };
 
 class App : public nanogui::Screen {
@@ -141,52 +276,24 @@ public:
     }
 
     virtual bool scrollEvent(const Vector2i &p, const Vector2f &rel){
-        /*if (fov >= 1.0f && fov <= 45.0f)
-            fov -= rel.y();
-        if (fov <= 1.0f)
-            fov = 1.0f;
-        if (fov >= 45.0f)
-            fov = 45.0f;
-
-        mCanvasObject->camera.fov = fov;*/
+        camera.ProcessMouseScroll(rel.y());
     }
 
     virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
-        /*if(((p.x() >= 15.0f && p.x() <= 15.0f + WINDOW_WIDTH) || 
-            (p.x() >= 515.0f && p.x() <= 515.0f + WINDOW_WIDTH)) && (p.y() >= 15.0f && p.y() <= 15.0f + WINDOW_HEIGHT) ){
-            //If the mouse is moved for the very first time
-            if(firstMouse){
-                lastX = p.x();
-                lastY = p.y();
-                firstMouse = false;
-            }
 
-            float xoffset = p.x() - lastX;
-            float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
+        if (firstMouse){
             lastX = p.x();
             lastY = p.y();
+            firstMouse = false;
+        }
 
-            float sensitivity = 0.01f; // change this value to your liking
-            xoffset *= sensitivity;
-            yoffset *= sensitivity;
+        float xoffset = p.x() - lastX;
+        float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
 
-            yaw += xoffset;
-            pitch += yoffset;
+        lastX = p.x();
+        lastY = p.y();
 
-            // make sure that when pitch is out of bounds, screen doesn't get flipped
-            if (pitch > 89.0f)
-                pitch = 89.0f;
-            if (pitch < -89.0f)
-                pitch = -89.0f;
-
-            //Setting new yaw and pitch values for opengl canvas
-            mCanvasObject->camera.yaw = yaw;
-            mCanvasObject->camera.pitch = pitch;
-
-            //Setting new yaw and pitch values for close2gl canvas
-            mCanvasObjectC2GL->close2gl.yaw = yaw;
-            mCanvasObjectC2GL->close2gl.pitch = pitch;
-        }*/
+        camera.ProcessMouseMovement(xoffset, yoffset);
 
         return true;
 
@@ -201,71 +308,35 @@ public:
             return true;
         }
 
-        /*const float camera_speed = 1.0f;
-
-        //Translation along the z axis (towards negative z axis, close up effect)
-        if (key == GLFW_KEY_W){
+        if(key == GLFW_KEY_W){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-
-                mCanvasObject->camera.processRotation(FORWARD);
-                mCanvasObjectC2GL->close2gl.processRotation(FORWARD);
-
+                camera.ProcessKeyboard(FORWARD, deltaTime);
                 return true;
             }
         }
 
-        //Translation along the z axis (towards positive z axis, zoom out effect)
         if (key == GLFW_KEY_S){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-
-                mCanvasObject->camera.processRotation(BACKWARD);
-                mCanvasObjectC2GL->close2gl.processRotation(BACKWARD);
-
+                camera.ProcessKeyboard(BACKWARD, deltaTime);
                 return true;
             }
         
         }
 
+        if (key == GLFW_KEY_A){
+            while(action == GLFW_REPEAT || action == GLFW_PRESS){
+                camera.ProcessKeyboard(LEFT, deltaTime);
+                return true;
+            }
+        }
+
         //Translation along the X axis (towards positive x axis)
         if (key == GLFW_KEY_D){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-
-                mCanvasObject->camera.processRotation(RIGHT);
-                mCanvasObjectC2GL->close2gl.processRotation(RIGHT);
-
+                camera.ProcessKeyboard(RIGHT, deltaTime);
                 return true;
             }
         }
-
-        if (key == GLFW_KEY_A){
-            while(action == GLFW_REPEAT || action == GLFW_PRESS){
-
-                mCanvasObject->camera.processRotation(LEFT);
-                mCanvasObjectC2GL->close2gl.processRotation(LEFT);
-
-                return true;
-            }
-        }
-
-        /*if (key == GLFW_KEY_Q){
-            while(action == GLFW_REPEAT || action == GLFW_PRESS){
-
-                mCanvasObject->camera.processRotation(UP);
-                mCanvasObjectC2GL->close2gl.processRotation(UP);
-
-                return true;
-            }
-        }
-
-        if (key == GLFW_KEY_Z){
-            while(action == GLFW_REPEAT || action == GLFW_PRESS){
-
-                mCanvasObject->camera.processRotation(DOWN);
-                mCanvasObjectC2GL->close2gl.processRotation(DOWN);
-
-                return true;
-            }
-        }*/
 
         return false;
     }
@@ -297,4 +368,50 @@ int main(){
         #endif
         return -1;
     }
+}
+
+
+vector<image> readCSV(const char* filename){
+    vector<image> images;
+    string line;
+    ifstream csvfile(filename);
+
+    int num_line = 0;
+
+    while(getline(csvfile, line)){
+        stringstream ss(line);
+        string line_value;
+        image current_image;
+        int num_value = 0;
+        while(getline(ss, line_value, ',')){
+            if(num_line != 0){
+                switch(num_value){
+                    case 0:
+                        current_image.path = line_value;
+                        break;
+                    case 1:
+                        current_image.position.x = stof(line_value);
+                        break;
+                    case 2:
+                        current_image.position.y = stof(line_value);
+                        break;
+                    case 3:
+                        current_image.position.z = stof(line_value);
+                        break;
+                }    
+            }
+
+            num_value += 1;
+        }
+
+        images.push_back(current_image);
+
+        /*if(num_line >= 5){
+            break;
+        }*/
+
+        num_line += 1;
+    }
+
+    return images;
 }
