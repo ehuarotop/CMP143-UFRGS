@@ -102,6 +102,17 @@ public:
     void drawImage(image img){
         unsigned int VAO, VBO, EBO;
 
+        //Loading image at this point to control aspect ratio
+        int width, height, nrChannels;
+        stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
+        unsigned char *data = stbi_load((string("./../") + string(img.path)).c_str(), &width, &height, &nrChannels, 0);
+
+        //Calculating y_size in order to preserve aspect aspect ratio
+        //y_size = (float(height) * x_size)/float(width);
+        y_size= x_size * (float(height)/float(width));
+
+        //cout<<height<<" "<<width<<" "<<float(height)/float(width)<<" "<<y_size/x_size<<endl;
+
         float vertices[] = {
             img.position.x + x_size, img.position.y + y_size, img.position.z, 1.0f, 1.0f, // top right
             img.position.x + x_size, img.position.y - y_size, img.position.z, 1.0f, 0.0f, // bottom right
@@ -153,13 +164,7 @@ public:
         // set texture filtering parameters
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        // load image, create texture and generate mipmaps
-        int width, height, nrChannels;
-        stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
-        //"/home/ehuarotop/Documents/Computer_Science/UFRGS/CMP143/trabalhos/final/cpp/src/sha1-1b2196da2c51242134eb1a0999b7b7599c97a92a.jpg"
-        //./../src/sha1-1b2196da2c51242134eb1a0999b7b7599c97a92a.jpg"
-        //"./../dataset/Images/map/sha1-21372b0ef040de3db2321c57e88fb6cde0eb60b3.jpg"
-        unsigned char *data = stbi_load((string("./../") + string(img.path)).c_str(), &width, &height, &nrChannels, 0);
+        //create texture and generate mipmaps from loaded image at the begining of this function
         if (data)
         {   
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
@@ -233,8 +238,8 @@ private:
     vector<image> images;
     vector<int> vaos;
     vector<int> textures;
-    float x_size = 0.15f;
-    float y_size = 0.3f;
+    float x_size = 0.2f;
+    float y_size;
 };
 
 class App : public nanogui::Screen {
@@ -414,7 +419,7 @@ vector<image> readCSV(const char* filename){
 
         images.push_back(current_image);
 
-        /*if(num_line >= 50){
+        /*if(num_line >= 10){
             break;
         }*/
 
