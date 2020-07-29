@@ -230,10 +230,10 @@ public:
             glm::vec3 billboardPosition = images[i].position;
             glm::vec2 billboardSize = glm::vec2(0.4, y_sizes[i]*2);
 
-            glUniform3fv(cameraRightWorldSpaceLoc, 1, GL_FALSE, glm::value_ptr(cameraRightWorldSpace));
-            glUniform3fv(cameraUpWorldSpaceLoc, 1, GL_FALSE, glm::value_ptr(cameraUpWorldSpace));
-            glUniform3fv(billboardPositionLoc, 1, GL_FALSE, glm::value_ptr(billboardPosition));
-            glUniform2fv(billboardSizeLoc, 1, GL_FALSE, glm::value_ptr(billboardSize));
+            glUniform3fv(cameraRightWorldSpaceLoc, 1, glm::value_ptr(cameraRightWorldSpace));
+            glUniform3fv(cameraUpWorldSpaceLoc, 1, glm::value_ptr(cameraUpWorldSpace));
+            glUniform3fv(billboardPositionLoc, 1, glm::value_ptr(billboardPosition));
+            glUniform2fv(billboardSizeLoc, 1, glm::value_ptr(billboardSize));
 
             //Activating textures
             glActiveTexture(GL_TEXTURE0);

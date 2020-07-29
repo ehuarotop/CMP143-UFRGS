@@ -20,7 +20,7 @@ void main() {
 										+ cameraRightWorldSpace * position.x * billboardSize.x
 										+ cameraUpWorldSpace * position.y * billboardSize.y;
 
-	gl_Position = projection * view * vec4(vertexPosition_worldSpace);
+	gl_Position = projection * view * vec4(vertexPosition_worldSpace, 1.0f);
 
     //gl_Position = projection * view * model * vec4(position, 1.0f);
     TexCoord = vec2(aTexCoord.x, aTexCoord.y);
