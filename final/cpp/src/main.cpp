@@ -105,7 +105,7 @@ public:
         //Loading image at this point to control aspect ratio
         int width, height, nrChannels;
         stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
-        unsigned char *data = stbi_load((string("./../") + string(img.path)).c_str(), &width, &height, &nrChannels, 0);
+        unsigned char *data = stbi_load((string("./../") + string(img.path)).c_str(), &width, &height, &nrChannels, 3);
 
         //Calculating y_size in order to preserve aspect aspect ratio
         //y_size = (float(height) * x_size)/float(width);
