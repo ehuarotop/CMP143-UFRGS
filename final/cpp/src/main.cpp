@@ -228,7 +228,8 @@ public:
 
             //Setting needed elements for billboarding
             glm::vec3 billboardPosition = images[i].position;
-            glm::vec2 billboardSize = glm::vec2(0.4, y_sizes[i]*2);
+            //glm::vec2 billboardSize = glm::vec2(0.4f, y_sizes[i]*2.0f);
+            glm::vec2 billboardSize = glm::vec2(1.0f, 1.0f); //why??
 
             glUniform3fv(cameraRightWorldSpaceLoc, 1, glm::value_ptr(cameraRightWorldSpace));
             glUniform3fv(cameraUpWorldSpaceLoc, 1, glm::value_ptr(cameraUpWorldSpace));
@@ -258,7 +259,7 @@ private:
     vector<image> images;
     vector<int> vaos;
     vector<int> textures;
-    vector<int> y_sizes;
+    vector<float> y_sizes;
     float x_size = 0.2f;
     float y_size;
 };
