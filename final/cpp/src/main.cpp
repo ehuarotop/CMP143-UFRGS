@@ -111,6 +111,9 @@ public:
         //y_size = (float(height) * x_size)/float(width);
         y_size= x_size * (float(height)/float(width));
 
+        //Appending y_size to y_sizes vector
+        y_sizes.push_back(y_size);
+
         //cout<<height<<" "<<width<<" "<<float(height)/float(width)<<" "<<y_size/x_size<<endl;
 
         float vertices[] = {
@@ -203,6 +206,10 @@ public:
         // camera/view transformation
         glm::mat4 view = camera.GetViewMatrix();
 
+        //Billboarding: Getting camera right and Up vector in world space
+        glm::vec3 cameraRightWorldSpace = glm::vec3(view[0][0], view[1][0], view[2][0]);
+        glm::vec3 cameraUpWorldSpace = glm::vec3(view[0][1], view[1][1], view[2][1]);
+
         for(int i=0; i<vaos.size(); i++){
             glm::mat4 model = glm::mat4(1.0f);
             //Passing model, view and projection matrix to the vertex shader
@@ -210,10 +217,23 @@ public:
             unsigned int viewLoc  = glGetUniformLocation(custom_shader.ID, "view");
             unsigned int projectionLoc  = glGetUniformLocation(custom_shader.ID, "projection");
             unsigned int textureLoc = glGetUniformLocation(custom_shader.ID, "texture1");
+            unsigned int cameraRightWorldSpaceLoc = glGetUniformLocation(custom_shader.ID, "cameraRightWorldSpace");
+            unsigned int cameraUpWorldSpaceLoc = glGetUniformLocation(custom_shader.ID, "cameraUpWorldSpace");
+            unsigned int billboardPositionLoc = glGetUniformLocation(custom_shader.ID, "billboardPosition");
+            unsigned int billboardSizeLoc = glGetUniformLocation(custom_shader.ID, "billboardSize");
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
             glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
             glUniform1i(textureLoc, 0);
+
+            //Setting needed elements for billboarding
+            glm::vec3 billboardPosition = images[i].position;
+            glm::vec2 billboardSize = glm::vec2(0.4, y_sizes[i]*2);
+
+            glUniform3fv(cameraRightWorldSpaceLoc, 1, GL_FALSE, glm::value_ptr(cameraRightWorldSpace));
+            glUniform3fv(cameraUpWorldSpaceLoc, 1, GL_FALSE, glm::value_ptr(cameraUpWorldSpace));
+            glUniform3fv(billboardPositionLoc, 1, GL_FALSE, glm::value_ptr(billboardPosition));
+            glUniform2fv(billboardSizeLoc, 1, GL_FALSE, glm::value_ptr(billboardSize));
 
             //Activating textures
             glActiveTexture(GL_TEXTURE0);
@@ -238,6 +258,7 @@ private:
     vector<image> images;
     vector<int> vaos;
     vector<int> textures;
+    vector<int> y_sizes;
     float x_size = 0.2f;
     float y_size;
 };
