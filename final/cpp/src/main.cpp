@@ -117,7 +117,7 @@ public:
             img.position.x + x_size, img.position.y + y_size, img.position.z, 1.0f, 1.0f, // top right
             img.position.x + x_size, img.position.y - y_size, img.position.z, 1.0f, 0.0f, // bottom right
             img.position.x - x_size, img.position.y - y_size, img.position.z, 0.0f, 0.0f, // bottom left
-            img.position.x - x_size, img.position.y + y_size, img.position.z, 0.0f, 0.1f// top left 
+            img.position.x - x_size, img.position.y + y_size, img.position.z, 0.0f, 1.0f// top left 
         };
         
         unsigned int indices[] = {
