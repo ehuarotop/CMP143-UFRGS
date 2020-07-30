@@ -60,8 +60,10 @@ using namespace std;
 using namespace nanogui;
 
 
-int WINDOW_WIDTH=600;
-int WINDOW_HEIGHT=600;
+int WINDOW_WIDTH=950;
+int WINDOW_HEIGHT=650;
+
+float positionScale = 10.0f;
 
 //Defining struct for triangle (close2gl)
 struct image {
@@ -74,10 +76,11 @@ vector<image> readCSV(const char* filename);
 bool replace(std::string& str, const std::string& from, const std::string& to);
 
 //global variables used to control camera
-Camera camera = Camera(glm::vec3(0.0f, 0.0f, 5.0f));
+Camera camera = Camera(glm::vec3(0.0f, 0.0f, 20.0f));
 float lastX = WINDOW_WIDTH / 2.0f;
 float lastY = WINDOW_HEIGHT / 2.0f;
 bool firstMouse = true;
+bool mouseButtonPressed = false;
 
 float deltaTime = 0.0f; // time between current frame and last frame
 float lastFrame = 0.0f;
@@ -310,21 +313,36 @@ public:
         camera.ProcessMouseScroll(rel.y());
     }
 
+    virtual bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers){
+        if (button == GLFW_MOUSE_BUTTON_LEFT && down) {
+            //glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
+            mouseButtonPressed = true;
+        }
+        if (button == GLFW_MOUSE_BUTTON_LEFT && !down)
+        {
+            // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
+            // variável abaixo para false.
+            mouseButtonPressed = false;
+        }
+    }
+
     virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
 
-        if (firstMouse){
+        if(mouseButtonPressed){
+            if (firstMouse){
+                lastX = p.x();
+                lastY = p.y();
+                firstMouse = false;
+            }
+
+            float xoffset = p.x() - lastX;
+            float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
+
             lastX = p.x();
             lastY = p.y();
-            firstMouse = false;
+
+            camera.ProcessMouseMovement(xoffset, yoffset);
         }
-
-        float xoffset = p.x() - lastX;
-        float yoffset = lastY - p.y(); // reversed since y-coordinates go from bottom to top
-
-        lastX = p.x();
-        lastY = p.y();
-
-        camera.ProcessMouseMovement(xoffset, yoffset);
 
         return true;
 
@@ -401,7 +419,6 @@ int main(){
     }
 }
 
-
 vector<image> readCSV(const char* filename){
     vector<image> images;
     string line;
@@ -425,13 +442,13 @@ vector<image> readCSV(const char* filename){
                         current_image.path = line_value;
                         break;
                     case 1:
-                        current_image.position.x = stof(line_value);
+                        current_image.position.x = stof(line_value)*positionScale;
                         break;
                     case 2:
-                        current_image.position.y = stof(line_value);
+                        current_image.position.y = stof(line_value)*positionScale;
                         break;
                     case 3:
-                        current_image.position.z = stof(line_value);
+                        current_image.position.z = stof(line_value)*positionScale;
                         break;
                 }    
             }
