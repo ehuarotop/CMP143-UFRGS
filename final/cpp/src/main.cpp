@@ -75,6 +75,7 @@ struct image {
 //Function declaration
 vector<image> readCSV(const char* filename);
 bool replace(std::string& str, const std::string& from, const std::string& to);
+bool sortbysec(const image &img1, const image &img2);
 
 //global variables used to control camera
 Camera camera = Camera(glm::vec3(0.0f, 0.0f, 20.0f));
@@ -524,8 +525,15 @@ vector<image> readCSV(const char* filename){
         num_line += 1;
     }
 
+    //Sorting images vector
+    sort(images.begin(), images.end(), sortbysec);
+
     return images;
 }
+
+bool sortbysec(const image &img1, const image &img2){ 
+    return (img1.position.z > img2.position.z); 
+} 
 
 bool replace(std::string& str, const std::string& from, const std::string& to) {
     size_t start_pos = str.find(from);
