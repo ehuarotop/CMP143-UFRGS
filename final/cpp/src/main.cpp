@@ -340,8 +340,7 @@ public:
 
     virtual bool mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers){
 
-        if(mouseButtonPressed){
-            if (firstMouse){
+        if (firstMouse){
                 lastX = p.x();
                 lastY = p.y();
                 firstMouse = false;
@@ -353,6 +352,7 @@ public:
             lastX = p.x();
             lastY = p.y();
 
+        if(mouseButtonPressed){
             camera.ProcessMouseMovement(xoffset, yoffset);
         }
 
