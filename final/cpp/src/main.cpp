@@ -70,12 +70,14 @@ float positionScale = 1.0f;
 struct image {
     string path;
     glm::vec3 position;
+    float distance_from_camera;
 };
 
 //Function declaration
 vector<image> readCSV(const char* filename);
 bool replace(std::string& str, const std::string& from, const std::string& to);
-bool sortbysec(const image &img1, const image &img2);
+bool sortbyz(const image &img1, const image &img2);
+bool sortby_distanceFromCamera(const image &img1, const image &img2);
 
 //global variables used to control camera
 Camera camera = Camera(glm::vec3(0.0f, 0.0f, 20.0f));
@@ -83,9 +85,12 @@ float lastX = WINDOW_WIDTH / 2.0f;
 float lastY = WINDOW_HEIGHT / 2.0f;
 bool firstMouse = true;
 bool mouseButtonPressed = false;
+bool keyPressed = false;
 
 float deltaTime = 0.0f; // time between current frame and last frame
 float lastFrame = 0.0f;
+
+Camera_Movement movement;
 
 ///////////////////////////////// CANVAS DECLARATION OPENGL /////////////////////////////////
 class MyGLCanvas : public GLCanvas{
@@ -204,7 +209,12 @@ public:
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA);
+
+        //Processing camera movement (FORWARD, BACKWARD, LEFT, RIGHT)
+        if(keyPressed){
+            camera.ProcessKeyboard(movement, deltaTime);
+            keyPressed = false; 
+        }       
 
         // pass projection matrix to shader (note that in this case it could change every frame)
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.1f, 100.0f);
@@ -224,6 +234,13 @@ public:
 
         // TODO: For correct Z-order rendering, must now SORT images based on
         // distance from the camera, and render Back-to-Front
+        for(int i=0; i<vaos.size(); i++){
+            //dotproduct(camera view, (objPos_worldspace - cameraPos_worldspace))
+            images[i].distance_from_camera = glm::dot(camera.Front, images[i].position - glm::vec3(glm::inverse(view) * glm::vec4(0,0,0,1)));
+        }
+
+        //sorting by distance from camera
+        sort(images.begin(), images.end(), sortby_distanceFromCamera);
 
         for(int i=0; i<vaos.size(); i++){
             glm::mat4 model = glm::mat4(1.0f);
@@ -371,14 +388,18 @@ public:
 
         if(key == GLFW_KEY_W){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                camera.ProcessKeyboard(FORWARD, deltaTime);
+                movement = FORWARD;
+                keyPressed = true;
+                //camera.ProcessKeyboard(FORWARD, deltaTime);
                 return true;
             }
         }
 
         if (key == GLFW_KEY_S){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                camera.ProcessKeyboard(BACKWARD, deltaTime);
+                movement = BACKWARD;
+                keyPressed = true;
+                //camera.ProcessKeyboard(BACKWARD, deltaTime);
                 return true;
             }
         
@@ -386,7 +407,9 @@ public:
 
         if (key == GLFW_KEY_A){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                camera.ProcessKeyboard(LEFT, deltaTime);
+                movement = LEFT;
+                keyPressed = true;
+                //camera.ProcessKeyboard(LEFT, deltaTime);
                 return true;
             }
         }
@@ -394,7 +417,9 @@ public:
         //Translation along the X axis (towards positive x axis)
         if (key == GLFW_KEY_D){
             while(action == GLFW_REPEAT || action == GLFW_PRESS){
-                camera.ProcessKeyboard(RIGHT, deltaTime);
+                movement = RIGHT;
+                keyPressed = true;
+                //camera.ProcessKeyboard(RIGHT, deltaTime);
                 return true;
             }
         }
@@ -526,14 +551,18 @@ vector<image> readCSV(const char* filename){
     }
 
     //Sorting images vector
-    sort(images.begin(), images.end(), sortbysec);
+    sort(images.begin(), images.end(), sortbyz);
 
     return images;
 }
 
-bool sortbysec(const image &img1, const image &img2){ 
+bool sortbyz(const image &img1, const image &img2){ 
     return (img1.position.z > img2.position.z); 
-} 
+}
+
+bool sortby_distanceFromCamera(const image &img1, const image &img2){ 
+    return (img1.distance_from_camera > img2.distance_from_camera); 
+}
 
 bool replace(std::string& str, const std::string& from, const std::string& to) {
     size_t start_pos = str.find(from);
