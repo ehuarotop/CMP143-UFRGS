@@ -201,8 +201,6 @@ public:
         //Loading the shader program
         custom_shader.use();
 
-        //Enabling depth test
-        glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA);
@@ -216,6 +214,15 @@ public:
         //Billboarding: Getting camera right and Up vector in world space
         glm::vec3 cameraRightWorldSpace = glm::vec3(view[0][0], view[1][0], view[2][0]);
         glm::vec3 cameraUpWorldSpace = glm::vec3(view[0][1], view[1][1], view[2][1]);
+
+        //Enabling depth test
+        // glEnable(GL_DEPTH_TEST);
+
+        // XXX: For BLENDING we must _disable_ the Depth test!
+        glDisable(GL_DEPTH_TEST);
+
+        // TODO: For correct Z-order rendering, must now SORT images based on
+        // distance from the camera, and render Back-to-Front
 
         for(int i=0; i<vaos.size(); i++){
             glm::mat4 model = glm::mat4(1.0f);

@@ -15,7 +15,7 @@ void main() {
     float distance_from_center = length(TexCoord.xy - vec2(0.5,0.5));
     float v = gaussian(distance_from_center, 0.05);
     //vec4 density_color = vec4(v,v,v,1); // quanto habilitar o blending: vec4(1,1,1,v);
-    vec4 density_color = vec4(1,1,1,v);
+    vec4 density_color = vec4(1,1,1,0.2*v);
     vec4 image_color = texture(texture1, TexCoord);
     float alpha = clamp(2 * gaussian(distance_from_camera, 25.0), 0, 1); // TODO: talvez encontrar valor melhor
     outColor = mix(density_color, image_color, alpha);
