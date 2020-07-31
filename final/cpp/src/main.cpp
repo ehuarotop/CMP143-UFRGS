@@ -55,6 +55,7 @@
 #include <string>
 #include <sstream>
 #include <stdlib.h>
+#include <numeric>
 
 using namespace std;
 using namespace nanogui;
@@ -63,7 +64,7 @@ using namespace nanogui;
 int WINDOW_WIDTH=950;
 int WINDOW_HEIGHT=650;
 
-float positionScale = 10.0f;
+float positionScale = 1.0f;
 
 //Defining struct for triangle (close2gl)
 struct image {
@@ -202,6 +203,9 @@ public:
 
         //Enabling depth test
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA);
 
         // pass projection matrix to shader (note that in this case it could change every frame)
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.1f, 100.0f);
@@ -424,9 +428,61 @@ vector<image> readCSV(const char* filename){
     string line;
     ifstream csvfile(filename);
 
+    vector<float> x_positions;
+    vector<float> y_positions;
+    vector<float> z_positions;
+
     int num_line = 0;
 
     while(getline(csvfile, line)){
+        stringstream ss(line);
+        string line_value;
+
+        int num_value = 0;
+
+        while(getline(ss, line_value, ',')){
+            if(num_line != 0){
+                switch(num_value){
+                    case 1:
+                        x_positions.push_back(stof(line_value));
+                        //cout<<"dssadsa";
+                        break;
+                    case 2:
+                        y_positions.push_back(stof(line_value));
+                        break;
+                    case 3:
+                        z_positions.push_back(stof(line_value));
+                }
+            }
+
+            num_value += 1;
+        }
+
+        num_line +=1;
+    }
+
+    //Getting average value per axis
+    float mean_x = accumulate( x_positions.begin(), x_positions.end(), 0.0) / x_positions.size();
+    float mean_y = accumulate( y_positions.begin(), y_positions.end(), 0.0) / y_positions.size();
+    float mean_z = accumulate( z_positions.begin(), z_positions.end(), 0.0) / z_positions.size();
+
+    //Getting std value per axis
+    float sq_sum_x = std::inner_product(x_positions.begin(), x_positions.end(), x_positions.begin(), 0.0);
+    float stdev_x = std::sqrt(sq_sum_x / x_positions.size() - mean_x * mean_x);
+
+    float sq_sum_y = std::inner_product(y_positions.begin(), y_positions.end(), y_positions.begin(), 0.0);
+    float stdev_y = std::sqrt(sq_sum_y / y_positions.size() - mean_y * mean_y);
+
+    float sq_sum_z = std::inner_product(z_positions.begin(), z_positions.end(), z_positions.begin(), 0.0);
+    float stdev_z = std::sqrt(sq_sum_z / z_positions.size() - mean_z * mean_z);
+
+    //Setting line counter again to zero to start with
+    num_line = 0;
+
+    ifstream csvfile2(filename);
+
+    //Iterating to get all positions separated by axis
+    while(getline(csvfile2, line)){
         stringstream ss(line);
         string line_value;
         image current_image;
@@ -442,13 +498,13 @@ vector<image> readCSV(const char* filename){
                         current_image.path = line_value;
                         break;
                     case 1:
-                        current_image.position.x = stof(line_value)*positionScale;
+                        current_image.position.x = ((stof(line_value) - mean_x) / stdev_x)*positionScale;
                         break;
                     case 2:
-                        current_image.position.y = stof(line_value)*positionScale;
+                        current_image.position.y = ((stof(line_value) - mean_y) / stdev_y)*positionScale;
                         break;
                     case 3:
-                        current_image.position.z = stof(line_value)*positionScale;
+                        current_image.position.z = ((stof(line_value) - mean_z) / stdev_z)*positionScale;
                         break;
                 }    
             }
@@ -457,10 +513,6 @@ vector<image> readCSV(const char* filename){
         }
 
         images.push_back(current_image);
-
-        /*if(num_line >= 10){
-            break;
-        }*/
 
         num_line += 1;
     }
