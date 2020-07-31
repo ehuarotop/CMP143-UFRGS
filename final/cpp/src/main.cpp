@@ -71,6 +71,8 @@ struct image {
     string path;
     glm::vec3 position;
     float distance_from_camera;
+    unsigned int VAO;
+    unsigned int texture;
 };
 
 //Function declaration
@@ -109,7 +111,7 @@ public:
         custom_shader.use();
     }
 
-    void drawImage(image img){
+    void drawImage(image& img){
         unsigned int VAO, VBO, EBO;
 
         //Loading image at this point to control aspect ratio
@@ -164,7 +166,9 @@ public:
         //Unbinding VAO
         glBindVertexArray(0);
 
-        vaos.push_back(VAO);
+        //saving on image struct
+        img.VAO = VAO;
+        //vaos.push_back(VAO);
 
         unsigned int texture1;
         // texture 1
@@ -191,7 +195,8 @@ public:
         stbi_image_free(data);
 
         //Storing textures
-        textures.push_back(texture1);
+        img.texture = texture1;
+        //textures.push_back(texture1);
 
     }
 
@@ -234,15 +239,15 @@ public:
 
         // TODO: For correct Z-order rendering, must now SORT images based on
         // distance from the camera, and render Back-to-Front
-        for(int i=0; i<vaos.size(); i++){
+        for(int i=0; i<images.size(); i++){
             //dotproduct(camera view, (objPos_worldspace - cameraPos_worldspace))
-            glm::vec3 cameraPos_worldspace = glm::vec3(glm::inverse(view) * glm::vec4(0,0,0,1));
-            glm::vec3 vertexPosition_worldSpace = images[i].position 
-                                        + cameraRightWorldSpace * images[i].position.x
-                                        + cameraUpWorldSpace * images[i].position.y;
+            //glm::vec3 cameraPos_worldspace = glm::vec3(glm::inverse(view) * glm::vec4(0,0,0,1));
+            //glm::vec3 vertexPosition_worldSpace = images[i].position 
+              //                          + cameraRightWorldSpace * images[i].position.x
+                //                        + cameraUpWorldSpace * images[i].position.y;
 
 
-            images[i].distance_from_camera = glm::length(vertexPosition_worldSpace - cameraPos_worldspace);
+            images[i].distance_from_camera = glm::length(images[i].position - camera.Position);
 
             //images[i].distance_from_camera = glm::dot(camera.Front, images[i].position - glm::vec3(glm::inverse(view) * glm::vec4(0,0,0,1)));
         }
@@ -250,7 +255,7 @@ public:
         //sorting by distance from camera
         sort(images.begin(), images.end(), sortby_distanceFromCamera);
 
-        for(int i=0; i<vaos.size(); i++){
+        for(int i=0; i<images.size(); i++){
             glm::mat4 model = glm::mat4(1.0f);
             //Passing model, view and projection matrix to the vertex shader
             unsigned int modelLoc = glGetUniformLocation(custom_shader.ID, "model");
@@ -278,15 +283,21 @@ public:
 
             //Activating textures
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, textures[i]);
+            //glBindTexture(GL_TEXTURE_2D, textures[i]);
+            glBindTexture(GL_TEXTURE_2D,images[i].texture);
 
             //Binding VAOs
-            glBindVertexArray(vaos[i]);
+            //glBindVertexArray(vaos[i]);
+            glBindVertexArray(images[i].VAO);
             //Actual drawing
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             //Unbinding VAOs
             glBindBuffer(GL_ARRAY_BUFFER, 0);
-            glBindVertexArray(0); 
+            glBindVertexArray(0);
+
+            /*cout<<"--------------"<<i<<"----------------"<<endl;
+            cout<< images[i].VAO << endl;
+            cout<< images[i].texture << endl;*/
         }
 
         glDisable(GL_DEPTH_TEST);
@@ -559,13 +570,13 @@ vector<image> readCSV(const char* filename){
     }
 
     //Sorting images vector
-    sort(images.begin(), images.end(), sortbyz);
+    //sort(images.begin(), images.end(), sortbyz);
 
     return images;
 }
 
 bool sortbyz(const image &img1, const image &img2){ 
-    return (img1.position.z < img2.position.z); 
+    return (img1.position.z > img2.position.z); 
 }
 
 bool sortby_distanceFromCamera(const image &img1, const image &img2){ 
