@@ -236,7 +236,15 @@ public:
         // distance from the camera, and render Back-to-Front
         for(int i=0; i<vaos.size(); i++){
             //dotproduct(camera view, (objPos_worldspace - cameraPos_worldspace))
-            images[i].distance_from_camera = glm::dot(camera.Front, images[i].position - glm::vec3(glm::inverse(view) * glm::vec4(0,0,0,1)));
+            glm::vec3 cameraPos_worldspace = glm::vec3(glm::inverse(view) * glm::vec4(0,0,0,1));
+            glm::vec3 vertexPosition_worldSpace = images[i].position 
+                                        + cameraRightWorldSpace * images[i].position.x
+                                        + cameraUpWorldSpace * images[i].position.y;
+
+
+            images[i].distance_from_camera = glm::length(vertexPosition_worldSpace - cameraPos_worldspace);
+
+            //images[i].distance_from_camera = glm::dot(camera.Front, images[i].position - glm::vec3(glm::inverse(view) * glm::vec4(0,0,0,1)));
         }
 
         //sorting by distance from camera
@@ -557,7 +565,7 @@ vector<image> readCSV(const char* filename){
 }
 
 bool sortbyz(const image &img1, const image &img2){ 
-    return (img1.position.z > img2.position.z); 
+    return (img1.position.z < img2.position.z); 
 }
 
 bool sortby_distanceFromCamera(const image &img1, const image &img2){ 
